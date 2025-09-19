@@ -1,71 +1,140 @@
 Option Explicit
 
-Public Sub CheckAll()
-    Call CheckGenre       ' ④ テンプレートジャンル名チェック
-    Call CheckSubject     ' ⑤ メール件名チェック
-    Call CheckMailBody    ' ⑥ メール本文チェック
-End Sub
+' === 共通：表頭行を探す（「メール本文」で特定） ===
+Private Function GetHeaderRow(ws As Worksheet) As Long
+    Dim hdrCell As Range
+    Set hdrCell = ws.Cells.Find(What:="メール本文", LookAt:=xlWhole)
+    If hdrCell Is Nothing Then
+        GetHeaderRow = -1
+    Else
+        GetHeaderRow = hdrCell.Row
+    End If
+End Function
 
-' ④ テンプレートジャンル名チェック（例：50文字以内）
-Private Sub CheckGenre()
+
+' === ④ テンプレートジャンル名チェック ===
+Private Function CheckTemplateGenre_Result(ws As Worksheet, headerRow As Long) As String
     Const HEADER As String = "テンプレートジャンル名"
     Const MAX_LEN As Long = 50
-    Const START_ROW As Long = 3
-
-    Call CheckColumnLength(HEADER, MAX_LEN, START_ROW)
-End Sub
-
-' ⑤ メール件名チェック（例：改行なし & 50文字以内）
-Private Sub CheckSubject()
-    Const HEADER As String = "メール件名"
-    Const MAX_LEN As Long = 50
-    Const START_ROW As Long = 3
-
-    Call CheckColumnLength(HEADER, MAX_LEN, START_ROW, True)
-End Sub
-
-' ⑥ メール本文チェック（900文字以内）
-Private Sub CheckMailBody()
-    Const HEADER As String = "メール本文"
-    Const MAX_LEN As Long = 900
-    Const START_ROW As Long = 3
-
-    Call CheckColumnLength(HEADER, MAX_LEN, START_ROW)
-End Sub
-
-' 共通処理：列の文字数チェック
-Private Sub CheckColumnLength(ByVal HEADER As String, ByVal MAX_LEN As Long, ByVal START_ROW As Long, Optional ByVal NoLineBreak As Boolean = False)
-    Dim ws As Worksheet: Set ws = ActiveSheet
-    Dim hdrCell As Range, col As Long
-    Dim lastRow As Long, r As Long, txt As String, L As Long
+    Dim hdrCell As Range, col As Long, startRow As Long, lastRow As Long
+    Dim r As Long, txt As String, L As Long
     Dim errCount As Long, errList As String
 
-    ' ヘッダー探す
-    Set hdrCell = ws.Cells.Find(What:=HEADER, LookAt:=xlWhole)
+    Set hdrCell = ws.Rows(headerRow).Find(What:=HEADER, LookAt:=xlWhole)
     If hdrCell Is Nothing Then
-        MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
-        Exit Sub
+        CheckTemplateGenre_Result = "列見出し「" & HEADER & "」が見つかりません。"
+        Exit Function
     End If
 
     col = hdrCell.Column
+    startRow = headerRow + 2
     lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
-    If lastRow < START_ROW Then Exit Sub
 
-    ' 文字数チェック
-    For r = START_ROW To lastRow
+    For r = startRow To lastRow
         txt = CStr(ws.Cells(r, col).Value)
         L = Len(txt)
+        If InStr(txt, vbLf) > 0 Or InStr(txt, vbCr) > 0 Then
+            errCount = errCount + 1
+            errList = errList & "行 " & r & "：改行コードあり" & vbCrLf
+        End If
+        If L > MAX_LEN Then
+            errCount = errCount + 1
+            errList = errList & "行 " & r & "：" & L & "文字（上限 " & MAX_LEN & "）" & vbCrLf
+        End If
+    Next r
 
-        If L > MAX_LEN Or (NoLineBreak And (InStr(txt, vbLf) > 0 Or InStr(txt, vbCr) > 0)) Then
+    If errCount = 0 Then
+        CheckTemplateGenre_Result = "OK（全て改行なし、かつ " & MAX_LEN & "文字以内）"
+    Else
+        CheckTemplateGenre_Result = "エラー " & errCount & " 件：" & vbCrLf & errList
+    End If
+End Function
+
+
+' === ⑤ メール件名チェック ===
+Private Function CheckMailSubject_Result(ws As Worksheet, headerRow As Long) As String
+    Const HEADER As String = "メール件名"
+    Dim hdrCell As Range, col As Long, startRow As Long, lastRow As Long
+    Dim r As Long, txt As String
+    Dim errCount As Long, errList As String
+
+    Set hdrCell = ws.Rows(headerRow).Find(What:=HEADER, LookAt:=xlWhole)
+    If hdrCell Is Nothing Then
+        CheckMailSubject_Result = "列見出し「" & HEADER & "」が見つかりません。"
+        Exit Function
+    End If
+
+    col = hdrCell.Column
+    startRow = headerRow + 2
+    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
+
+    For r = startRow To lastRow
+        txt = CStr(ws.Cells(r, col).Value)
+        If InStr(txt, vbLf) > 0 Or InStr(txt, vbCr) > 0 Then
+            errCount = errCount + 1
+            errList = errList & "行 " & r & "：改行コードあり" & vbCrLf
+        End If
+    Next r
+
+    If errCount = 0 Then
+        CheckMailSubject_Result = "OK（全て改行なし）"
+    Else
+        CheckMailSubject_Result = "エラー " & errCount & " 件：" & vbCrLf & errList
+    End If
+End Function
+
+
+' === ⑥ メール本文チェック ===
+Private Function CheckMailBody_Result(ws As Worksheet, headerRow As Long) As String
+    Const HEADER As String = "メール本文"
+    Const MAX_LEN As Long = 900
+    Dim hdrCell As Range, col As Long, startRow As Long, lastRow As Long
+    Dim r As Long, txt As String, L As Long
+    Dim errCount As Long, errList As String
+
+    Set hdrCell = ws.Rows(headerRow).Find(What:=HEADER, LookAt:=xlWhole)
+    If hdrCell Is Nothing Then
+        CheckMailBody_Result = "列見出し「" & HEADER & "」が見つかりません。"
+        Exit Function
+    End If
+
+    col = hdrCell.Column
+    startRow = headerRow + 2
+    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
+
+    For r = startRow To lastRow
+        txt = CStr(ws.Cells(r, col).Value)
+        L = Len(txt)
+        If L > MAX_LEN Then
             errCount = errCount + 1
             errList = errList & "行 " & r & "：" & L & "文字" & vbCrLf
         End If
     Next r
 
-    ' 結果表示
     If errCount = 0 Then
-        MsgBox HEADER & "：チェック完了（" & START_ROW & "行目以降は全て" & MAX_LEN & "文字以内）", vbInformation
+        CheckMailBody_Result = "OK（全て " & MAX_LEN & "文字以内）"
     Else
-        MsgBox HEADER & "：エラー " & errCount & " 件" & vbCrLf & errList, vbExclamation
+        CheckMailBody_Result = "エラー " & errCount & " 件：" & vbCrLf & errList
     End If
+End Function
+
+
+' === 総合チェック用 ===
+Public Sub CheckAll()
+    Dim ws As Worksheet: Set ws = ActiveSheet
+    Dim headerRow As Long
+    Dim result As String
+    
+    headerRow = GetHeaderRow(ws)
+    If headerRow = -1 Then
+        MsgBox "表頭に「メール本文」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
+
+    result = "【総合チェック結果】" & vbCrLf & vbCrLf
+    result = result & "④ テンプレートジャンル名：" & vbCrLf & CheckTemplateGenre_Result(ws, headerRow) & vbCrLf & vbCrLf
+    result = result & "⑤ メール件名：" & vbCrLf & CheckMailSubject_Result(ws, headerRow) & vbCrLf & vbCrLf
+    result = result & "⑥ メール本文：" & vbCrLf & CheckMailBody_Result(ws, headerRow)
+
+    MsgBox result, vbInformation
 End Sub
