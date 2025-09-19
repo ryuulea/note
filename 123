@@ -1,105 +1,46 @@
 Option Explicit
 
-' ④ テンプレートジャンル名チェック（改行なし ＋ 50文字以内）
-Public Sub CheckTemplateGenre()
+Public Sub CheckAll()
+    Call CheckGenre       ' ④ テンプレートジャンル名チェック
+    Call CheckSubject     ' ⑤ メール件名チェック
+    Call CheckMailBody    ' ⑥ メール本文チェック
+End Sub
+
+' ④ テンプレートジャンル名チェック（例：50文字以内）
+Private Sub CheckGenre()
     Const HEADER As String = "テンプレートジャンル名"
     Const MAX_LEN As Long = 50
+    Const START_ROW As Long = 3
 
-    Dim ws As Worksheet: Set ws = ActiveSheet
-    Dim hdrCell As Range, col As Long, headerRow As Long
-    Dim startRow As Long, lastRow As Long
-    Dim r As Long, txt As String, L As Long
-    Dim errCount As Long, errList As String
-
-    ' ヘッダー検索
-    Set hdrCell = ws.Cells.Find(What:=HEADER, LookAt:=xlWhole)
-    If hdrCell Is Nothing Then
-        MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
-        Exit Sub
-    End If
-
-    col = hdrCell.Column
-    headerRow = hdrCell.Row
-    startRow = headerRow + 2
-    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
-
-    For r = startRow To lastRow
-        txt = CStr(ws.Cells(r, col).Value)
-        L = Len(txt)
-
-        ' 改行チェック
-        If InStr(txt, vbLf) > 0 Or InStr(txt, vbCr) > 0 Then
-            errCount = errCount + 1
-            errList = errList & "行 " & r & "：改行コードあり" & vbCrLf
-        End If
-
-        ' 文字数チェック
-        If L > MAX_LEN Then
-            errCount = errCount + 1
-            errList = errList & "行 " & r & "：" & L & "文字（上限 " & MAX_LEN & "）" & vbCrLf
-        End If
-    Next r
-
-    If errCount = 0 Then
-        MsgBox "チェック完了：「" & HEADER & "」列は全て改行なし、かつ " & MAX_LEN & "文字以内です。", vbInformation
-    Else
-        MsgBox "エラー：" & errCount & " 件" & vbCrLf & errList, vbExclamation
-    End If
+    Call CheckColumnLength(HEADER, MAX_LEN, START_ROW)
 End Sub
 
-
-' ⑤ メール件名チェック（改行なし）
-Public Sub CheckMailSubject()
+' ⑤ メール件名チェック（例：改行なし & 50文字以内）
+Private Sub CheckSubject()
     Const HEADER As String = "メール件名"
+    Const MAX_LEN As Long = 50
+    Const START_ROW As Long = 3
 
-    Dim ws As Worksheet: Set ws = ActiveSheet
-    Dim hdrCell As Range, col As Long, headerRow As Long
-    Dim startRow As Long, lastRow As Long
-    Dim r As Long, txt As String
-    Dim errCount As Long, errList As String
-
-    ' ヘッダー検索
-    Set hdrCell = ws.Cells.Find(What:=HEADER, LookAt:=xlWhole)
-    If hdrCell Is Nothing Then
-        MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
-        Exit Sub
-    End If
-
-    col = hdrCell.Column
-    headerRow = hdrCell.Row
-    startRow = headerRow + 2
-    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
-
-    For r = startRow To lastRow
-        txt = CStr(ws.Cells(r, col).Value)
-
-        ' 改行チェック
-        If InStr(txt, vbLf) > 0 Or InStr(txt, vbCr) > 0 Then
-            errCount = errCount + 1
-            errList = errList & "行 " & r & "：改行コードあり" & vbCrLf
-        End If
-    Next r
-
-    If errCount = 0 Then
-        MsgBox "チェック完了：「" & HEADER & "」列は全て改行なしです。", vbInformation
-    Else
-        MsgBox "エラー：" & errCount & " 件" & vbCrLf & errList, vbExclamation
-    End If
+    Call CheckColumnLength(HEADER, MAX_LEN, START_ROW, True)
 End Sub
-
 
 ' ⑥ メール本文チェック（900文字以内）
-Public Sub CheckMailBody()
+Private Sub CheckMailBody()
     Const HEADER As String = "メール本文"
     Const MAX_LEN As Long = 900
+    Const START_ROW As Long = 3
 
+    Call CheckColumnLength(HEADER, MAX_LEN, START_ROW)
+End Sub
+
+' 共通処理：列の文字数チェック
+Private Sub CheckColumnLength(ByVal HEADER As String, ByVal MAX_LEN As Long, ByVal START_ROW As Long, Optional ByVal NoLineBreak As Boolean = False)
     Dim ws As Worksheet: Set ws = ActiveSheet
-    Dim hdrCell As Range, col As Long, headerRow As Long
-    Dim startRow As Long, lastRow As Long
-    Dim r As Long, txt As String, L As Long
+    Dim hdrCell As Range, col As Long
+    Dim lastRow As Long, r As Long, txt As String, L As Long
     Dim errCount As Long, errList As String
 
-    ' ヘッダー検索
+    ' ヘッダー探す
     Set hdrCell = ws.Cells.Find(What:=HEADER, LookAt:=xlWhole)
     If hdrCell Is Nothing Then
         MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
@@ -107,22 +48,24 @@ Public Sub CheckMailBody()
     End If
 
     col = hdrCell.Column
-    headerRow = hdrCell.Row
-    startRow = headerRow + 2
     lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
+    If lastRow < START_ROW Then Exit Sub
 
-    For r = startRow To lastRow
+    ' 文字数チェック
+    For r = START_ROW To lastRow
         txt = CStr(ws.Cells(r, col).Value)
         L = Len(txt)
-        If L > MAX_LEN Then
+
+        If L > MAX_LEN Or (NoLineBreak And (InStr(txt, vbLf) > 0 Or InStr(txt, vbCr) > 0)) Then
             errCount = errCount + 1
             errList = errList & "行 " & r & "：" & L & "文字" & vbCrLf
         End If
     Next r
 
+    ' 結果表示
     If errCount = 0 Then
-        MsgBox "チェック完了：「" & HEADER & "」列は全て " & MAX_LEN & "文字以内です。", vbInformation
+        MsgBox HEADER & "：チェック完了（" & START_ROW & "行目以降は全て" & MAX_LEN & "文字以内）", vbInformation
     Else
-        MsgBox "エラー：" & errCount & " 件" & vbCrLf & errList, vbExclamation
+        MsgBox HEADER & "：エラー " & errCount & " 件" & vbCrLf & errList, vbExclamation
     End If
 End Sub
