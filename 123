@@ -1,7 +1,95 @@
 Option Explicit
 
-' 表のヘッダー行を自動検出して、「メール本文」列の3行目以降（= ヘッダー+2）を900文字チェック
-Public Sub CheckMailBody900_ByHeaderAnywhere()
+' ④ テンプレートジャンル名チェック（改行なし ＋ 50文字以内）
+Public Sub CheckTemplateGenre()
+    Const HEADER As String = "テンプレートジャンル名"
+    Const MAX_LEN As Long = 50
+
+    Dim ws As Worksheet: Set ws = ActiveSheet
+    Dim hdrCell As Range, col As Long, headerRow As Long
+    Dim startRow As Long, lastRow As Long
+    Dim r As Long, txt As String, L As Long
+    Dim errCount As Long, errList As String
+
+    ' ヘッダー検索
+    Set hdrCell = ws.Cells.Find(What:=HEADER, LookAt:=xlWhole)
+    If hdrCell Is Nothing Then
+        MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
+
+    col = hdrCell.Column
+    headerRow = hdrCell.Row
+    startRow = headerRow + 2
+    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
+
+    For r = startRow To lastRow
+        txt = CStr(ws.Cells(r, col).Value)
+        L = Len(txt)
+
+        ' 改行チェック
+        If InStr(txt, vbLf) > 0 Or InStr(txt, vbCr) > 0 Then
+            errCount = errCount + 1
+            errList = errList & "行 " & r & "：改行コードあり" & vbCrLf
+        End If
+
+        ' 文字数チェック
+        If L > MAX_LEN Then
+            errCount = errCount + 1
+            errList = errList & "行 " & r & "：" & L & "文字（上限 " & MAX_LEN & "）" & vbCrLf
+        End If
+    Next r
+
+    If errCount = 0 Then
+        MsgBox "チェック完了：「" & HEADER & "」列は全て改行なし、かつ " & MAX_LEN & "文字以内です。", vbInformation
+    Else
+        MsgBox "エラー：" & errCount & " 件" & vbCrLf & errList, vbExclamation
+    End If
+End Sub
+
+
+' ⑤ メール件名チェック（改行なし）
+Public Sub CheckMailSubject()
+    Const HEADER As String = "メール件名"
+
+    Dim ws As Worksheet: Set ws = ActiveSheet
+    Dim hdrCell As Range, col As Long, headerRow As Long
+    Dim startRow As Long, lastRow As Long
+    Dim r As Long, txt As String
+    Dim errCount As Long, errList As String
+
+    ' ヘッダー検索
+    Set hdrCell = ws.Cells.Find(What:=HEADER, LookAt:=xlWhole)
+    If hdrCell Is Nothing Then
+        MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
+
+    col = hdrCell.Column
+    headerRow = hdrCell.Row
+    startRow = headerRow + 2
+    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
+
+    For r = startRow To lastRow
+        txt = CStr(ws.Cells(r, col).Value)
+
+        ' 改行チェック
+        If InStr(txt, vbLf) > 0 Or InStr(txt, vbCr) > 0 Then
+            errCount = errCount + 1
+            errList = errList & "行 " & r & "：改行コードあり" & vbCrLf
+        End If
+    Next r
+
+    If errCount = 0 Then
+        MsgBox "チェック完了：「" & HEADER & "」列は全て改行なしです。", vbInformation
+    Else
+        MsgBox "エラー：" & errCount & " 件" & vbCrLf & errList, vbExclamation
+    End If
+End Sub
+
+
+' ⑥ メール本文チェック（900文字以内）
+Public Sub CheckMailBody()
     Const HEADER As String = "メール本文"
     Const MAX_LEN As Long = 900
 
@@ -11,11 +99,8 @@ Public Sub CheckMailBody900_ByHeaderAnywhere()
     Dim r As Long, txt As String, L As Long
     Dim errCount As Long, errList As String
 
-    ' 1) シート全体からヘッダー「メール本文」を検索（完全一致）
-    Set hdrCell = ws.Cells.Find(What:=HEADER, After:=ws.Cells(1, 1), _
-                                LookIn:=xlFormulas, LookAt:=xlWhole, _
-                                SearchOrder:=xlByRows, SearchDirection:=xlNext, MatchCase:=False)
-
+    ' ヘッダー検索
+    Set hdrCell = ws.Cells.Find(What:=HEADER, LookAt:=xlWhole)
     If hdrCell Is Nothing Then
         MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
         Exit Sub
@@ -23,32 +108,21 @@ Public Sub CheckMailBody900_ByHeaderAnywhere()
 
     col = hdrCell.Column
     headerRow = hdrCell.Row
-
-    ' 2) チェック開始行：ヘッダー行の「3行目」= ヘッダー行 + 2
     startRow = headerRow + 2
-
-    ' 3) 最終行（対象列の下端）
     lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
-    If lastRow < startRow Then
-        MsgBox "チェック対象データがありません（" & startRow & "行以降）。", vbInformation
-        Exit Sub
-    End If
 
-    ' 4) チェック本体
     For r = startRow To lastRow
         txt = CStr(ws.Cells(r, col).Value)
         L = Len(txt)
         If L > MAX_LEN Then
             errCount = errCount + 1
-            errList = errList & "行 " & r & "（" & L & " 文字）" & vbCrLf
+            errList = errList & "行 " & r & "：" & L & "文字" & vbCrLf
         End If
     Next r
 
-    ' 5) 結果表示
     If errCount = 0 Then
-        MsgBox "チェック完了：「" & HEADER & "」列の" & startRow & "行目以降は全て900文字以内です。", vbInformation
+        MsgBox "チェック完了：「" & HEADER & "」列は全て " & MAX_LEN & "文字以内です。", vbInformation
     Else
-        MsgBox "エラー：" & errCount & " 行が900文字を超えています。" & vbCrLf & vbCrLf & _
-               "詳細：" & vbCrLf & errList, vbExclamation
+        MsgBox "エラー：" & errCount & " 件" & vbCrLf & errList, vbExclamation
     End If
 End Sub
