@@ -1,45 +1,54 @@
 Option Explicit
 
-Public Sub CheckMailBody900_SimpleJP()
-    Const HEADER As String = "メール本文" ' チェック対象の列見出し
-    Const START_ROW As Long = 3           ' 3行目からチェック開始
-    Const MAX_LEN As Long = 900           ' 最大文字数
+' 表のヘッダー行を自動検出して、「メール本文」列の3行目以降（= ヘッダー+2）を900文字チェック
+Public Sub CheckMailBody900_ByHeaderAnywhere()
+    Const HEADER As String = "メール本文"
+    Const MAX_LEN As Long = 900
 
     Dim ws As Worksheet: Set ws = ActiveSheet
-    Dim lastCol As Long, lastRow As Long, col As Long
-    Dim found As Boolean
+    Dim hdrCell As Range, col As Long, headerRow As Long
+    Dim startRow As Long, lastRow As Long
+    Dim r As Long, txt As String, L As Long
+    Dim errCount As Long, errList As String
 
-    ' 1行目から「メール本文」列を探す
-    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
-    For col = 1 To lastCol
-        If Trim(CStr(ws.Cells(1, col).Value)) = HEADER Then
-            found = True
-            Exit For
-        End If
-    Next col
+    ' 1) シート全体からヘッダー「メール本文」を検索（完全一致）
+    Set hdrCell = ws.Cells.Find(What:=HEADER, After:=ws.Cells(1, 1), _
+                                LookIn:=xlFormulas, LookAt:=xlWhole, _
+                                SearchOrder:=xlByRows, SearchDirection:=xlNext, MatchCase:=False)
 
-    If Not found Then
+    If hdrCell Is Nothing Then
         MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
         Exit Sub
     End If
 
-    ' 最終行を取得
-    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
+    col = hdrCell.Column
+    headerRow = hdrCell.Row
 
-    ' チェック開始
-    Dim r As Long, txt As String, L As Long, errCount As Long
-    For r = START_ROW To lastRow
+    ' 2) チェック開始行：ヘッダー行の「3行目」= ヘッダー行 + 2
+    startRow = headerRow + 2
+
+    ' 3) 最終行（対象列の下端）
+    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
+    If lastRow < startRow Then
+        MsgBox "チェック対象データがありません（" & startRow & "行以降）。", vbInformation
+        Exit Sub
+    End If
+
+    ' 4) チェック本体
+    For r = startRow To lastRow
         txt = CStr(ws.Cells(r, col).Value)
         L = Len(txt)
         If L > MAX_LEN Then
             errCount = errCount + 1
+            errList = errList & "行 " & r & "（" & L & " 文字）" & vbCrLf
         End If
     Next r
 
-    ' 結果表示
+    ' 5) 結果表示
     If errCount = 0 Then
-        MsgBox "チェック完了：" & HEADER & "列（" & START_ROW & "行目以降）は全て900文字以内です。", vbInformation
+        MsgBox "チェック完了：「" & HEADER & "」列の" & startRow & "行目以降は全て900文字以内です。", vbInformation
     Else
-        MsgBox "エラー：" & errCount & " 行が900文字を超えています。", vbExclamation
+        MsgBox "エラー：" & errCount & " 行が900文字を超えています。" & vbCrLf & vbCrLf & _
+               "詳細：" & vbCrLf & errList, vbExclamation
     End If
 End Sub
