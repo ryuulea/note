@@ -1,90 +1,36 @@
-Option Explicit
-
-'=== 共通：メール本文の表頭行を探す ===
-Private Function GetHeaderRow(ws As Worksheet) As Long
-    Dim hdrCell As Range
-    Set hdrCell = ws.Cells.Find(What:="メール本文", LookAt:=xlWhole)
-    If hdrCell Is Nothing Then
-        GetHeaderRow = -1
-    Else
-        GetHeaderRow = hdrCell.Row
-    End If
-End Function
-
-'========================
-' メール本文のNG記号/絵文字検出（表頭行自動版）
-'========================
-Public Sub CheckMailBodySymbols()
-    Dim ws As Worksheet: Set ws = ActiveSheet
-    Dim headerRow As Long, col As Long, lastRow As Long
-    Dim r As Long, s As String, i As Long, cp As Long, hit As Boolean
-    
-    ' 表頭行を特定
-    headerRow = GetHeaderRow(ws)
-    If headerRow = -1 Then
-        MsgBox "表頭に「メール本文」が見つかりません。", vbExclamation
-        Exit Sub
-    End If
-    
-    ' 「メール本文」列を特定
-    col = ws.Rows(headerRow).Find(What:="メール本文", LookAt:=xlWhole).Column
-    
-    ' データ範囲（表頭行+2から）
-    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
-    ws.Range(ws.Cells(headerRow + 2, col), ws.Cells(lastRow, col)).Interior.ColorIndex = xlNone
-    
-    Application.ScreenUpdating = False
-    For r = headerRow + 2 To lastRow
-        s = CStr(ws.Cells(r, col).Value2)
-        hit = False
-        i = 1
-        Do While i <= Len(s)
-            cp = CodePointAt(s, i)                 ' Unicodeコードポイント取得
-            If Not IsIgnorable(cp) Then            ' FE0E/FE0F/200Dは無視
-                If IsNG(cp) Then
-                    hit = True
-                    Exit Do
-                End If
-            End If
-        Loop
-        If hit Then ws.Cells(r, col).Interior.Color = RGB(255, 235, 156) ' 薄黄色
-    Next r
-    Application.ScreenUpdating = True
-    
-    MsgBox "メール本文のNG記号/絵文字チェック完了。", vbInformation
-End Sub
-
-
-'--- サロゲート対応：現在位置のUnicodeコードポイントを返す（iも前進）
-Private Function CodePointAt(ByVal s As String, ByRef i As Long) As Long
-    Dim hi As Long, lo As Long
-    hi = AscW(Mid$(s, i, 1))
-    If hi >= &HD800 And hi <= &HDBFF And i < Len(s) Then
-        lo = AscW(Mid$(s, i + 1, 1))
-        If lo >= &HDC00 And lo <= &HDFFF Then
-            CodePointAt = ((hi - &HD800) * &H400) + (lo - &HDC00) + &H10000
-            i = i + 2: Exit Function
+lines = Split(txt, vbLf)   ' 改行ごとに分割
+For lineNo = LBound(lines) To UBound(lines)
+    oneLine = lines(lineNo)
+    For i = 1 To Len(oneLine)
+        c = Mid(oneLine, i, 1)
+        If c <> sQuestion And Asc(c) <> Asc(sQuestion) Then
+            cp = AscW(c)
+            Debug.Print c & " ：文字コード=" & Hex(cp)
+            Worksheets("チェック結果").Range("E" & exportRowNo).Value = c
+            Worksheets("チェック結果").Range("F" & exportRowNo).Value = _
+                "表行:" & r & " / 正文行:" & (lineNo + 1) & " / 文字コード: " & Hex(cp)
+            exportRowNo = exportRowNo + 1
         End If
-    End If
-    If hi < 0 Then hi = hi + 65536 ' AscW負値補正
-    CodePointAt = hi
-    i = i + 1
-End Function
+    Next i
+Next lineNo
 
-'--- 無視してよい制御系（異体選択子/ZWJ など）
-Private Function IsIgnorable(cp As Long) As Boolean
-    IsIgnorable = (cp = &HFE0E Or cp = &HFE0F Or cp = &H200D)
-End Function
 
-'--- NGレンジ定義：Emoji/PUA/記号・矢印・幾何
-Private Function IsNG(cp As Long) As Boolean
-    IsNG = _
-        (cp >= &HE000 And cp <= &HF8FF) Or _      ' 私用領域（PUA：旧携帯絵文字）
-        (cp >= &H1F000 And cp <= &H1FAFF) Or _    ' 標準Emoji
-        (cp >= &H2190 And cp <= &H21FF) Or _      ' 矢印
-        (cp >= &H2300 And cp <= &H23FF) Or _      ' 技術記号
-        (cp >= &H25A0 And cp <= &H25FF) Or _      ' 幾何学模様（黒三角・黒四角など）
-        (cp >= &H2600 And cp <= &H27BF) Or _      ' 各種記号（音符♪、星★ 等）
-        (cp >= &H2900 And cp <= &H297F) Or _      ' 追加矢印
-        (cp >= &H2B00 And cp <= &H2BFF)           ' その他記号と矢印
-End Function
+lines = Split(txt, vbLf)   ' 改行ごとに分割
+For lineNo = LBound(lines) To UBound(lines)
+    oneLine = lines(lineNo)
+    For i = 1 To Len(oneLine)
+        c = Mid(oneLine, i, 1)
+        If c <> sQuestion And Asc(c) <> Asc(sQuestion) Then
+            cp = AscW(c)
+            Debug.Print c & " ：文字コード=" & Hex(cp)
+
+            ' 出力：問題文字
+            Worksheets("チェック結果").Range("E" & exportRowNo).Value = c
+            ' 出力：表格行号 + 正文行号 + Unicode
+            Worksheets("チェック結果").Range("F" & exportRowNo).Value = _
+                "表行: " & r & " / 正文行: " & (lineNo + 1) & " / コード: U+" & Hex(cp)
+
+            exportRowNo = exportRowNo + 1
+        End If
+    Next i
+Next lineNo
