@@ -1,43 +1,52 @@
-For r = startRow To lastRow
-    txt = CStr(ws.Cells(r, col).Value)
-    L = Len(txt)
+Private Function CheckMailBody_Result(ws As Worksheet, headerRow As Long) As String
+    Const HEADER As String = "メール本文"
+    Const MAX_LEN As Long = 900
+    Dim hdrCell As Range, col As Long, startRow As Long, lastRow As Long
+    Dim r As Long, txt As String, L As Long
+    Dim errCount As Long, errList As String
+    Dim i As Long, c As String, cp As Long
+    Dim exportRowNo As Long
     
-    ' --- 900文字超過チェック ---
-    If L > MAX_LEN Then
-        errCount = errCount + 1
-        Worksheets("チェック結果").Range("E" & exportRowNo).Value = "―"
-        Worksheets("チェック結果").Range("F" & exportRowNo).Value = _
-            "表行:" & r & " / 文字数超過 (" & L & "文字)"
-        exportRowNo = exportRowNo + 1
+    ' ヘッダー列を探す
+    Set hdrCell = ws.Rows(headerRow).Find(What:=HEADER, LookAt:=xlWhole)
+    If hdrCell Is Nothing Then
+        CheckMailBody_Result = "列見出し「" & HEADER & "」が見つかりません。"
+        Exit Function
     End If
     
-    ' --- Shift-JIS非対応文字チェック ---
-    For i = 1 To L
-        c = Mid(txt, i, 1)
-        If c <> sQuestion And Asc(c) <> Asc(sQuestion) Then
+    col = hdrCell.Column
+    startRow = headerRow + 2
+    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
+    exportRowNo = 2
+    
+    For r = startRow To lastRow
+        txt = CStr(ws.Cells(r, col).Value)
+        L = Len(txt)
+        
+        ' 文字数オーバーチェック
+        If L > MAX_LEN Then
+            errCount = errCount + 1
+            errList = errList & "行 " & r & " : " & L & "文字（制限 " & MAX_LEN & "）超過" & vbCrLf
+        End If
+        
+        ' 文字ごとのSJISチェック
+        For i = 1 To L
+            c = Mid(txt, i, 1)
             cp = AscW(c)
-            ' SJISで保存できない文字をチェックするならここに判定を追加する
             If Not IsSjisSafe(cp) Then
                 Worksheets("チェック結果").Range("E" & exportRowNo).Value = c
                 Worksheets("チェック結果").Range("F" & exportRowNo).Value = _
-                    "表行:" & r & " / 正文行:" & i & " / 文字コード:" & Hex(cp)
+                    "表行:" & r & " / 正文行:" & i & " / 文字コード: " & Hex(cp)
                 exportRowNo = exportRowNo + 1
                 errCount = errCount + 1
             End If
-        End If
-    Next i
-Next r
-
-
-Private Function IsSjisSafe(cp As Long) As Boolean
-    On Error Resume Next
-    Dim s As String
-    s = ChrW(cp)
-    Dim b() As Byte
-    b = StrConv(s, vbFromUnicode, 932) ' 932 = Shift-JIS
-    If StrConv(b, vbUnicode, 932) = s Then
-        IsSjisSafe = True
+        Next i
+    Next r
+    
+    ' 判定結果を返す
+    If errCount = 0 Then
+        CheckMailBody_Result = "OK（全て " & MAX_LEN & "文字以内・SJIS保存可能）"
     Else
-        IsSjisSafe = False
+        CheckMailBody_Result = "エラー " & errCount & "件（詳細はチェック結果シートをご確認ください）"
     End If
 End Function
