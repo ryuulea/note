@@ -1,36 +1,44 @@
-lines = Split(txt, vbLf)   ' 改行ごとに分割
-For lineNo = LBound(lines) To UBound(lines)
-    oneLine = lines(lineNo)
-    For i = 1 To Len(oneLine)
-        c = Mid(oneLine, i, 1)
-        If c <> sQuestion And Asc(c) <> Asc(sQuestion) Then
-            cp = AscW(c)
-            Debug.Print c & " ：文字コード=" & Hex(cp)
-            Worksheets("チェック結果").Range("E" & exportRowNo).Value = c
-            Worksheets("チェック結果").Range("F" & exportRowNo).Value = _
-                "表行:" & r & " / 正文行:" & (lineNo + 1) & " / 文字コード: " & Hex(cp)
-            exportRowNo = exportRowNo + 1
-        End If
-    Next i
-Next lineNo
-
-
-lines = Split(txt, vbLf)   ' 改行ごとに分割
-For lineNo = LBound(lines) To UBound(lines)
-    oneLine = lines(lineNo)
-    For i = 1 To Len(oneLine)
-        c = Mid(oneLine, i, 1)
-        If c <> sQuestion And Asc(c) <> Asc(sQuestion) Then
-            cp = AscW(c)
-            Debug.Print c & " ：文字コード=" & Hex(cp)
-
-            ' 出力：問題文字
-            Worksheets("チェック結果").Range("E" & exportRowNo).Value = c
-            ' 出力：表格行号 + 正文行号 + Unicode
-            Worksheets("チェック結果").Range("F" & exportRowNo).Value = _
-                "表行: " & r & " / 正文行: " & (lineNo + 1) & " / コード: U+" & Hex(cp)
-
-            exportRowNo = exportRowNo + 1
-        End If
-    Next i
-Next lineNo
+Public Sub CheckAll()
+    Dim ws As Worksheet: Set ws = ActiveSheet
+    Dim headerRow As Long
+    Dim resultA As String, resultB As String, resultC As String
+    Dim outWs As Worksheet
+    Dim outRow As Long
+    
+    headerRow = GetHeaderRow(ws)
+    If headerRow = -1 Then
+        MsgBox "表頭に「メール本文」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
+    
+    ' === 各チェック結果 ===
+    resultA = CheckTemplateGenre_Result(ws, headerRow)
+    resultB = CheckMailSubject_Result(ws, headerRow)
+    resultC = CheckMailBody_Result(ws, headerRow)
+    
+    ' === 出力先シート ===
+    Set outWs = ThisWorkbook.Sheets("チェック結果")
+    outWs.Cells.Clear
+    outRow = 1
+    
+    ' ヘッダー行
+    outWs.Cells(outRow, 1).Value = "テンプレートジャンル名 エラー"
+    outWs.Cells(outRow, 2).Value = "メール件名 エラー"
+    outWs.Cells(outRow, 3).Value = "メール本文 エラー"
+    outRow = outRow + 1
+    
+    ' Aのエラーが含まれる場合のみ出力
+    If InStr(resultA, "エラー") > 0 Then
+        outWs.Cells(outRow, 1).Value = resultA
+    End If
+    
+    ' Bのエラーが含まれる場合のみ出力
+    If InStr(resultB, "エラー") > 0 Then
+        outWs.Cells(outRow, 2).Value = resultB
+    End If
+    
+    ' Cのエラーが含まれる場合のみ出力
+    If InStr(resultC, "エラー") > 0 Then
+        outWs.Cells(outRow, 3).Value = resultC
+    End If
+End Sub
