@@ -16,9 +16,11 @@ Public Sub CheckAll()
     resultB = CheckMailSubject_Result(ws, headerRow)
     resultC = CheckMailBody_Result(ws, headerRow)
     
-    ' === 出力先シート ===
+   ' === 出力先シート ===
     Set outWs = ThisWorkbook.Sheets("チェック結果")
-    outWs.Cells.Clear
+
+    ' 只清空A～C，不动其他列
+    outWs.Range("A:C").Clear
     outRow = 1
     
     ' ヘッダー行
@@ -27,18 +29,19 @@ Public Sub CheckAll()
     outWs.Cells(outRow, 3).Value = "メール本文 エラー"
     outRow = outRow + 1
     
-    ' Aのエラーが含まれる場合のみ出力
+    ' Aのエラー
     If InStr(resultA, "エラー") > 0 Then
         outWs.Cells(outRow, 1).Value = resultA
     End If
     
-    ' Bのエラーが含まれる場合のみ出力
+    ' Bのエラー
     If InStr(resultB, "エラー") > 0 Then
         outWs.Cells(outRow, 2).Value = resultB
     End If
     
-    ' Cのエラーが含まれる場合のみ出力
+    ' Cのエラー
     If InStr(resultC, "エラー") > 0 Then
         outWs.Cells(outRow, 3).Value = resultC
     End If
+
 End Sub
