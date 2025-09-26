@@ -1,9 +1,10 @@
 Public Sub CheckAll()
     Dim ws As Worksheet: Set ws = ActiveSheet
     Dim headerRow As Long
-    Dim resultA As String, resultB As String, resultC As String
-    Dim outWs As Worksheet
-    Dim outRow As Long
+    Dim result As String
+    Dim genreResult As String, subjectResult As String, bodyResult As String
+    Dim lines() As String, i As Long
+    Dim wsOut As Worksheet
     
     headerRow = GetHeaderRow(ws)
     If headerRow = -1 Then
@@ -12,36 +13,48 @@ Public Sub CheckAll()
     End If
     
     ' === 各チェック結果 ===
-    resultA = CheckTemplateGenre_Result(ws, headerRow)
-    resultB = CheckMailSubject_Result(ws, headerRow)
-    resultC = CheckMailBody_Result(ws, headerRow)
+    genreResult = CheckTemplateGenre_Result(ws, headerRow)
+    subjectResult = CheckMailSubject_Result(ws, headerRow)
+    bodyResult = CheckMailBody_Result(ws, headerRow)
     
-   ' === 出力先シート ===
-    Set outWs = ThisWorkbook.Sheets("チェック結果")
-
-    ' 只清空A～C，不动其他列
-    outWs.Range("A:C").Clear
-    outRow = 1
+    ' === MsgBox 用まとめ ===
+    result = "【総合チェック結果】" & vbCrLf & vbCrLf
+    result = result & "④ テンプレートジャンル名：" & vbCrLf & genreResult & vbCrLf & vbCrLf
+    result = result & "⑤ メール件名：" & vbCrLf & subjectResult & vbCrLf & vbCrLf
+    result = result & "⑥ メール本文：" & vbCrLf & bodyResult
     
-    ' ヘッダー行
-    outWs.Cells(outRow, 1).Value = "テンプレートジャンル名 エラー"
-    outWs.Cells(outRow, 2).Value = "メール件名 エラー"
-    outWs.Cells(outRow, 3).Value = "メール本文 エラー"
-    outRow = outRow + 1
+    ' === 出力先シート ===
+    Set wsOut = Worksheets("チェック結果")
+    wsOut.Range("A:C").ClearContents   ' A～C だけ初期化
     
-    ' Aのエラー
-    If InStr(resultA, "エラー") > 0 Then
-        outWs.Cells(outRow, 1).Value = resultA
+    If InStr(result, "エラー") = 0 Then
+        ' === 全てOK ===
+        wsOut.Range("A1").Value = "OK（エラーなし）"
+    Else
+        ' === 見出し ===
+        wsOut.Range("A1").Value = "ジャンル名チェック"
+        wsOut.Range("B1").Value = "件名チェック"
+        wsOut.Range("C1").Value = "本文チェック"
+        
+        ' ジャンル名 → A列に逐行出力
+        lines = Split(genreResult, vbCrLf)
+        For i = 0 To UBound(lines)
+            wsOut.Cells(i + 2, 1).Value = lines(i)
+        Next i
+        
+        ' 件名 → B列に逐行出力
+        lines = Split(subjectResult, vbCrLf)
+        For i = 0 To UBound(lines)
+            wsOut.Cells(i + 2, 2).Value = lines(i)
+        Next i
+        
+        ' 本文 → C列に逐行出力
+        lines = Split(bodyResult, vbCrLf)
+        For i = 0 To UBound(lines)
+            wsOut.Cells(i + 2, 3).Value = lines(i)
+        Next i
     End If
     
-    ' Bのエラー
-    If InStr(resultB, "エラー") > 0 Then
-        outWs.Cells(outRow, 2).Value = resultB
-    End If
-    
-    ' Cのエラー
-    If InStr(resultC, "エラー") > 0 Then
-        outWs.Cells(outRow, 3).Value = resultC
-    End If
-
+    ' === MsgBox ===
+    MsgBox result, vbInformation
 End Sub
