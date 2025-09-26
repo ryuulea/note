@@ -1,11 +1,10 @@
-'=== ⑥ メール本文チェック ===
 Private Function CheckMailBody_Result(ws As Worksheet, headerRow As Long) As String
     Const HEADER As String = "メール本文"
     Const MAX_LEN As Long = 900
     Dim hdrCell As Range, col As Long, startRow As Long, lastRow As Long
     Dim r As Long, txt As String, L As Long
     Dim i As Long, c As String, cp As Long
-    Dim errCount As Long, errList As String
+    Dim errCount As Long
     Dim exportRowNo As Long
     
     ' 表頭位置を取得
@@ -28,7 +27,9 @@ Private Function CheckMailBody_Result(ws As Worksheet, headerRow As Long) As Str
         ' 文字数超過チェック
         If L > MAX_LEN Then
             errCount = errCount + 1
-            errList = errList & "行 " & r & " : " & L & "文字超過" & vbCrLf
+            Worksheets("チェック結果").Range("E" & exportRowNo).Value = "文字数超過"
+            Worksheets("チェック結果").Range("F" & exportRowNo).Value = "行:" & r & " / 文字数:" & L
+            exportRowNo = exportRowNo + 1
         End If
         
         ' 1文字ずつチェック
@@ -36,14 +37,11 @@ Private Function CheckMailBody_Result(ws As Worksheet, headerRow As Long) As Str
             c = Mid(txt, i, 1)
             cp = AscW(c)
             
-            ' SJIS不可文字チェック
             If Not IsSjisSafe(cp) Then
-                Worksheets("チェック結果").Range("E" & exportRowNo).Value = c
-                Worksheets("チェック結果").Range("F" & exportRowNo).Value = "表行:" & r & " / 正文行:" & i & " / 文字コード:" & Hex(cp)
-                exportRowNo = exportRowNo + 1
-                
                 errCount = errCount + 1
-                errList = errList & "行 " & r & " 正文行 " & i & " にSJIS不可文字あり" & vbCrLf
+                Worksheets("チェック結果").Range("E" & exportRowNo).Value = c
+                Worksheets("チェック結果").Range("F" & exportRowNo).Value = "行:" & r & " / 正文行:" & i & " / コード:" & Hex(cp)
+                exportRowNo = exportRowNo + 1
             End If
         Next i
     Next r
