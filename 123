@@ -5,7 +5,6 @@ Public Sub CheckAll()
     Dim wsOut As Worksheet
     Dim lines() As String, i As Long
     Dim msg As String
-    Dim errCountGenre As Long, errCountSubject As Long, errCountBody As Long
     
     headerRow = GetHeaderRow(ws)
     If headerRow = -1 Then
@@ -18,52 +17,50 @@ Public Sub CheckAll()
     subjectResult = CheckMailSubject_Result(ws, headerRow)
     bodyResult = CheckMailBody_Result(ws, headerRow)
     
-    ' === エラー件数を数える ===
-    errCountGenre = CountErrors(genreResult)
-    errCountSubject = CountErrors(subjectResult)
-    errCountBody = CountErrors(bodyResult)
-    
     ' === 出力先シート ===
     Set wsOut = Worksheets("チェック結果")
     wsOut.Range("A:C").ClearContents
     
-    ' ヘッダー
+    ' 見出し行
     wsOut.Range("A1").Value = "ジャンル名チェック"
     wsOut.Range("B1").Value = "件名チェック"
     wsOut.Range("C1").Value = "本文チェック"
     
     ' ジャンル名 → A列
-    lines = Split(genreResult, vbCrLf)
-    For i = 0 To UBound(lines)
-        wsOut.Cells(i + 2, 1).Value = lines(i)
-    Next i
+    If InStr(genreResult, "エラー") > 0 Then
+        lines = Split(genreResult, vbCrLf)
+        For i = 0 To UBound(lines)
+            wsOut.Cells(i + 2, 1).Value = lines(i)
+        Next i
+    Else
+        wsOut.Cells(2, 1).Value = "OK（エラーなし）"
+    End If
     
     ' 件名 → B列
-    lines = Split(subjectResult, vbCrLf)
-    For i = 0 To UBound(lines)
-        wsOut.Cells(i + 2, 2).Value = lines(i)
-    Next i
+    If InStr(subjectResult, "エラー") > 0 Then
+        lines = Split(subjectResult, vbCrLf)
+        For i = 0 To UBound(lines)
+            wsOut.Cells(i + 2, 2).Value = lines(i)
+        Next i
+    Else
+        wsOut.Cells(2, 2).Value = "OK（エラーなし）"
+    End If
     
     ' 本文 → C列
-    lines = Split(bodyResult, vbCrLf)
-    For i = 0 To UBound(lines)
-        wsOut.Cells(i + 2, 3).Value = lines(i)
-    Next i
+    If InStr(bodyResult, "エラー") > 0 Then
+        lines = Split(bodyResult, vbCrLf)
+        For i = 0 To UBound(lines)
+            wsOut.Cells(i + 2, 3).Value = lines(i)
+        Next i
+    Else
+        wsOut.Cells(2, 3).Value = "OK（エラーなし）"
+    End If
     
-    ' === MsgBox 簡潔表示 ===
-    msg = "テンプレートジャンル名：" & IIf(errCountGenre > 0, "エラーあり (" & errCountGenre & "件)", "OK") & vbCrLf & _
-          "メール件名：" & IIf(errCountSubject > 0, "エラーあり (" & errCountSubject & "件)", "OK") & vbCrLf & _
-          "メール本文：" & IIf(errCountBody > 0, "エラーあり (" & errCountBody & "件)", "OK") & vbCrLf & vbCrLf & _
+    ' === MsgBox（簡潔表示） ===
+    msg = "テンプレートジャンル名：" & IIf(InStr(genreResult, "エラー") > 0, "エラーあり", "OK") & vbCrLf & _
+          "メール件名：" & IIf(InStr(subjectResult, "エラー") > 0, "エラーあり", "OK") & vbCrLf & _
+          "メール本文：" & IIf(InStr(bodyResult, "エラー") > 0, "エラーあり", "OK") & vbCrLf & vbCrLf & _
           "詳細はチェック結果シートをご確認ください。"
     
     MsgBox msg, vbInformation
 End Sub
-
-' === エラー件数カウント用 ===
-Private Function CountErrors(resultText As String) As Long
-    If InStr(resultText, "エラー") > 0 Then
-        CountErrors = UBound(Split(resultText, vbCrLf)) + 1
-    Else
-        CountErrors = 0
-    End If
-End Function
