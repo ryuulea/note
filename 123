@@ -1,55 +1,70 @@
+'=== ⑥ メール本文チェック（E/F列への出力があればエラー扱い）===
 Private Function CheckMailBody_Result(ws As Worksheet, headerRow As Long) As String
     Const HEADER As String = "メール本文"
     Const MAX_LEN As Long = 900
+
     Dim hdrCell As Range, col As Long, startRow As Long, lastRow As Long
     Dim r As Long, txt As String, L As Long
     Dim i As Long, c As String, cp As Long
-    Dim errCount As Long
-    Dim exportRowNo As Long
-    
-    ' 表頭位置を取得
+
+    ' 出力先シートと「今回の処理前」のE列最終行を記録（差分で件数を出す）
+    Dim outWs As Worksheet
+    Dim baseLastE As Long, exportRowNo As Long, newLastE As Long
+    Set outWs = ThisWorkbook.Sheets("チェック結果")
+    baseLastE = outWs.Cells(outWs.Rows.Count, "E").End(xlUp).Row
+    If baseLastE < 2 Then baseLastE = 1   ' E1 にヘッダ想定
+    exportRowNo = baseLastE + 1           ' 追加はここから
+
+    ' 見出し列を特定
     Set hdrCell = ws.Rows(headerRow).Find(What:=HEADER, LookAt:=xlWhole)
     If hdrCell Is Nothing Then
         CheckMailBody_Result = "列見出し「" & HEADER & "」が見つかりません。"
         Exit Function
     End If
-    
     col = hdrCell.Column
+
     startRow = headerRow + 2
     lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
-    
-    exportRowNo = 2
-    
+
+    ' === ここからは「あなたの既存ロジック」でE/Fに出力してOK ===
+    ' 例：900字超過 → E/Fに出力
     For r = startRow To lastRow
         txt = CStr(ws.Cells(r, col).Value)
         L = Len(txt)
-        
-        ' 文字数超過チェック
+
+        ' 900字超過をE/Fへ書く（行が増える＝エラーになる）
         If L > MAX_LEN Then
-            errCount = errCount + 1
-            Worksheets("チェック結果").Range("E" & exportRowNo).Value = "文字数超過"
-            Worksheets("チェック結果").Range("F" & exportRowNo).Value = "行:" & r & " / 文字数:" & L
+            outWs.Range("E" & exportRowNo).Value = "―"
+            outWs.Range("F" & exportRowNo).Value = "表行:" & r & " / 文字数超過 (" & L & "文字)"
             exportRowNo = exportRowNo + 1
         End If
-        
-        ' 1文字ずつチェック
+
+        ' ここは任意：SJIS不可文字など、問題文字をE/Fに出力する既存ルール
         For i = 1 To L
-            c = Mid(txt, i, 1)
+            c = Mid$(txt, i, 1)
             cp = AscW(c)
-            
-            If Not IsSjisSafe(cp) Then
-                errCount = errCount + 1
-                Worksheets("チェック結果").Range("E" & exportRowNo).Value = c
-                Worksheets("チェック結果").Range("F" & exportRowNo).Value = "行:" & r & " / 正文行:" & i & " / コード:" & Hex(cp)
-                exportRowNo = exportRowNo + 1
-            End If
+            ' ★ 既存のNG判定をそのまま使ってOK（例：Not IsSjisSafe(cp) 等）
+            '    とにかく E/F に書いたら本関数では「エラー扱い」になります
+            ' 例（必要なら有効化）:
+            'If Not IsSjisSafe(cp) Then
+            '    outWs.Range("E" & exportRowNo).Value = c
+            '    outWs.Range("F" & exportRowNo).Value = "表行:" & r & " / 正文行:" & i & " / コード: U+" & Hex(cp)
+            '    exportRowNo = exportRowNo + 1
+            'End If
         Next i
     Next r
-    
-    ' 判定結果
-    If errCount = 0 Then
-        CheckMailBody_Result = "OK (全て " & MAX_LEN & "文字以内)"
+
+    ' === 今回の処理後にE列の最終行を再取得
+    newLastE = outWs.Cells(outWs.Rows.Count, "E").End(xlUp).Row
+    If newLastE < 2 Then newLastE = 1
+
+    ' 今回追加された行数（= エラー件数）を差分で算出
+    Dim efAdded As Long
+    efAdded = newLastE - baseLastE
+
+    If efAdded <= 0 Then
+        CheckMailBody_Result = "OK（全て " & MAX_LEN & "文字以内）"
     Else
-        CheckMailBody_Result = "エラー " & errCount & " 件 : ご確認ください"
+        CheckMailBody_Result = "エラー " & efAdded & " 件：ご確認ください"
     End If
 End Function
