@@ -1,75 +1,15 @@
-'=== メール本文 SJIS不可文字チェック ===
-Public Sub CheckMailBody_SJIS()
-    Const HEADER As String = "メール本文"
-    Dim ws As Worksheet, outWs As Worksheet
-    Dim hdrCell As Range, col As Long, startRow As Long, lastRow As Long
-    Dim r As Long, txt As String, L As Long
-    Dim i As Long, c As String, cp As Long
-    Dim exportRowNo As Long
-    Dim errCount As Long
-    Dim bodyRowNo As Long
-    
-    Set ws = ActiveSheet
-    Set outWs = Worksheets("チェック結果")
-    
-    ' 出力開始行（E列の最後の下）
-    exportRowNo = outWs.Cells(outWs.Rows.Count, "E").End(xlUp).Row + 1
-    
-    ' 「メール本文」列を探す
-    Set hdrCell = ws.Rows(1).Find(What:=HEADER, LookAt:=xlWhole)
-    If hdrCell Is Nothing Then
-        MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
-        Exit Sub
-    End If
-    col = hdrCell.Column
-    
-    ' データ範囲
-    startRow = 3   ' 2行目はサンプルだからスキップ
-    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
-    
-    bodyRowNo = 1
-    
-    ' 本文チェック
-    For r = startRow To lastRow
-        txt = CStr(ws.Cells(r, col).Value)
-        L = Len(txt)
-        
-        For i = 1 To L
-            c = Mid(txt, i, 1)
-            cp = AscW(c)
-            
-            ' SJIS不可文字チェック
-            If Not IsSjisSafe(cp) Then
-                outWs.Range("E" & exportRowNo).Value = c
-                outWs.Range("F" & exportRowNo).Value = bodyRowNo
-                outWs.Range("G" & exportRowNo).Value = i
-                outWs.Range("H" & exportRowNo).Value = "U+" & Hex(cp)
-                exportRowNo = exportRowNo + 1
-                errCount = errCount + 1
-            End If
-        Next i
-        
-        bodyRowNo = bodyRowNo + 1
-    Next r
-    
-    ' 結果メッセージ
-    If errCount = 0 Then
-        MsgBox "本文中にSJIS不可文字は見つかりませんでした。", vbInformation
-    Else
-        MsgBox "本文中にSJIS不可文字が " & errCount & " 件見つかりました。" & vbCrLf & _
-               "詳細はチェック結果シートをご確認ください。", vbExclamation
-    End If
-End Sub
-
 Private Function IsSjisSafe(cp As Long) As Boolean
-    On Error Resume Next
-    Dim s As String
+    Dim s As String, b() As Byte
     s = ChrW(cp)
-    Dim b() As Byte
-    b = StrConv(s, vbFromUnicode, 932) ' 932 = Shift-JIS
-    If StrConv(b, vbUnicode, 932) = s Then
-        IsSjisSafe = True
-    Else
+    b = StrConv(s, vbFromUnicode, 932)
+    
+    ' Shift-JIS → Unicode 再还原
+    If StrConv(b, vbUnicode, 932) <> s Then
         IsSjisSafe = False
+    ElseIf UBound(b) > 1 Then
+        ' 3バイト以上はSJISに存在しない
+        IsSjisSafe = False
+    Else
+        IsSjisSafe = True
     End If
 End Function
