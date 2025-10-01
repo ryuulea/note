@@ -3,9 +3,11 @@ Public Sub CheckMailBody_SJIS()
     Const HEADER As String = "メール本文"
     Dim ws As Worksheet, outWs As Worksheet
     Dim hdrCell As Range, col As Long, startRow As Long, lastRow As Long
-    Dim r As Long, txt As String
+    Dim r As Long, txt As String, L As Long
+    Dim i As Long, c As String, cp As Long
     Dim exportRowNo As Long
     Dim errCount As Long
+    Dim bodyRowNo As Long
     
     Set ws = ActiveSheet
     Set outWs = Worksheets("チェック結果")
@@ -25,24 +27,29 @@ Public Sub CheckMailBody_SJIS()
     startRow = 3   ' 2行目はサンプルだからスキップ
     lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
     
+    bodyRowNo = 1
+    
     ' 本文チェック
     For r = startRow To lastRow
         txt = CStr(ws.Cells(r, col).Value)
+        L = Len(txt)
         
-        ' Unicode→SJIS→Unicode でラウンドトリップ検証
-        Dim b() As Byte, txt2 As String
-        On Error Resume Next
-        b = StrConv(txt, vbFromUnicode, 932)   ' SJIS化
-        txt2 = StrConv(b, vbUnicode, 932)      ' 戻す
-        On Error GoTo 0
+        For i = 1 To L
+            c = Mid(txt, i, 1)
+            cp = AscW(c)
+            
+            ' SJIS不可文字チェック
+            If Not IsSjisSafe(cp) Then
+                outWs.Range("E" & exportRowNo).Value = c
+                outWs.Range("F" & exportRowNo).Value = bodyRowNo
+                outWs.Range("G" & exportRowNo).Value = i
+                outWs.Range("H" & exportRowNo).Value = "U+" & Hex(cp)
+                exportRowNo = exportRowNo + 1
+                errCount = errCount + 1
+            End If
+        Next i
         
-        If txt <> txt2 Then
-            outWs.Range("E" & exportRowNo).Value = txt
-            outWs.Range("F" & exportRowNo).Value = _
-                "表行:" & r & " にSJISで保存できない文字あり"
-            exportRowNo = exportRowNo + 1
-            errCount = errCount + 1
-        End If
+        bodyRowNo = bodyRowNo + 1
     Next r
     
     ' 結果メッセージ
@@ -53,3 +60,16 @@ Public Sub CheckMailBody_SJIS()
                "詳細はチェック結果シートをご確認ください。", vbExclamation
     End If
 End Sub
+
+Private Function IsSjisSafe(cp As Long) As Boolean
+    On Error Resume Next
+    Dim s As String
+    s = ChrW(cp)
+    Dim b() As Byte
+    b = StrConv(s, vbFromUnicode, 932) ' 932 = Shift-JIS
+    If StrConv(b, vbUnicode, 932) = s Then
+        IsSjisSafe = True
+    Else
+        IsSjisSafe = False
+    End If
+End Function
