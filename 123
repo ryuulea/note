@@ -1,3 +1,4 @@
+'=== メール本文 SJIS不可文字チェック ===
 Public Sub CheckMailBody_SJIS()
     Const HEADER As String = "メール本文"
     Dim ws As Worksheet, outWs As Worksheet
@@ -8,53 +9,53 @@ Public Sub CheckMailBody_SJIS()
     Dim exportRowNo As Long
     Dim errCount As Long
     Dim headerRow As Long
-
+    
     Set ws = ActiveSheet
     Set outWs = Worksheets("チェック結果")
-
+    
     ' 出力開始行（E列の最後の下）
     exportRowNo = outWs.Cells(outWs.Rows.Count, "E").End(xlUp).Row + 1
-
-    ' 表頭行を探す（共通関数利用）
+    
+    ' === 表頭行を探す ===
     headerRow = GetHeaderRow(ws, HEADER)
     If headerRow = -1 Then
         MsgBox "表頭に「" & HEADER & "」が見つかりません。", vbExclamation
         Exit Sub
     End If
-
-    ' メール本文列を特定
+    
+    ' === メール本文列を特定 ===
     Set hdrCell = ws.Rows(headerRow).Find(What:=HEADER, LookAt:=xlWhole)
     If hdrCell Is Nothing Then
         MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
         Exit Sub
     End If
     col = hdrCell.Column
-
-    ' データ範囲（サンプル行をスキップ）
-    startRow = headerRow + 2
+    
+    ' === データ範囲 ===
+    startRow = headerRow + 2   ' 表頭の次の行はサンプルだからスキップ
     lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
-
-    ' 本文チェック
+    
+    ' === 本文チェック ===
     For r = startRow To lastRow
         txt = CStr(ws.Cells(r, col).Value)
         L = Len(txt)
-
+        
         For i = 1 To L
             c = Mid(txt, i, 1)
             cp = AscW(c)
-
+            
             ' SJIS不可文字チェック
             If Not IsSjisSafe(cp) Then
                 outWs.Range("E" & exportRowNo).Value = c
                 outWs.Range("F" & exportRowNo).Value = _
-                    "表行:" & r & " / 正文位置:" & i & " / U+" & Hex(cp)
+                    "表行:" & r & " / 位置:" & i & " / U+" & Hex(cp)
                 exportRowNo = exportRowNo + 1
                 errCount = errCount + 1
             End If
         Next i
     Next r
-
-    ' 結果メッセージ
+    
+    ' === 結果メッセージ ===
     If errCount = 0 Then
         MsgBox "本文中にSJIS不可文字は見つかりませんでした。", vbInformation
     Else
@@ -63,6 +64,8 @@ Public Sub CheckMailBody_SJIS()
     End If
 End Sub
 
+
+'=== SJIS保存可否を判定する関数 ===
 Private Function IsSjisSafe(cp As Long) As Boolean
     On Error Resume Next
     Dim s As String
@@ -73,5 +76,17 @@ Private Function IsSjisSafe(cp As Long) As Boolean
         IsSjisSafe = True
     Else
         IsSjisSafe = False
+    End If
+End Function
+
+
+'=== 表頭行を探す関数（共通利用）===
+Private Function GetHeaderRow(ws As Worksheet, HEADER As String) As Long
+    Dim hdrCell As Range
+    Set hdrCell = ws.Cells.Find(What:=HEADER, LookAt:=xlWhole)
+    If hdrCell Is Nothing Then
+        GetHeaderRow = -1
+    Else
+        GetHeaderRow = hdrCell.Row
     End If
 End Function
