@@ -1,3 +1,16 @@
+'=== SJIS不可文字を検出する関数 ===
+Private Function IsSjisSafeChar(c As String) As Boolean
+    Dim b() As Byte
+    On Error Resume Next
+    b = StrConv(c, vbFromUnicode, 932) ' 932 = Shift-JIS
+    If StrConv(b, vbUnicode, 932) = c Then
+        IsSjisSafeChar = True
+    Else
+        IsSjisSafeChar = False
+    End If
+End Function
+
+
 '=== メール本文 SJIS不可文字チェック ===
 Public Sub CheckMailBody_SJIS()
     Const HEADER As String = "メール本文"
@@ -11,7 +24,7 @@ Public Sub CheckMailBody_SJIS()
     Set ws = ActiveSheet
     Set outWs = Worksheets("チェック結果")
     
-    ' 出力開始行（E列の最後の下）
+    ' 出力開始行（E列の最後の下から）
     exportRowNo = outWs.Cells(outWs.Rows.Count, "E").End(xlUp).Row + 1
     
     ' 「メール本文」列を探す
@@ -23,10 +36,10 @@ Public Sub CheckMailBody_SJIS()
     col = hdrCell.Column
     
     ' データ範囲
-    startRow = 3   ' 2行目はサンプルだからスキップ
+    startRow = 2
     lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
     
-    ' 本文チェック
+    ' 本文チェック（逐字）
     For r = startRow To lastRow
         txt = CStr(ws.Cells(r, col).Value)
         L = Len(txt)
@@ -35,11 +48,10 @@ Public Sub CheckMailBody_SJIS()
             c = Mid(txt, i, 1)
             cp = AscW(c)
             
-            ' SJIS不可文字チェック
-            If Not IsSjisSafe(cp) Then
+            If Not IsSjisSafeChar(c) Then
                 outWs.Range("E" & exportRowNo).Value = c
                 outWs.Range("F" & exportRowNo).Value = _
-                    "表行:" & r & " / 正文行:" & i & " / 文字コード: U+" & Hex(cp)
+                    "表行:" & r & " / 本文内位置:" & i & " / 文字コード: U+" & Hex(cp)
                 exportRowNo = exportRowNo + 1
                 errCount = errCount + 1
             End If
@@ -54,18 +66,3 @@ Public Sub CheckMailBody_SJIS()
                "詳細はチェック結果シートをご確認ください。", vbExclamation
     End If
 End Sub
-
-
-'=== SJIS判定関数 ===
-Private Function IsSjisSafe(cp As Long) As Boolean
-    On Error Resume Next
-    Dim s As String
-    s = ChrW(cp)
-    Dim b() As Byte
-    b = StrConv(s, vbFromUnicode, 932) ' 932 = Shift-JIS
-    If StrConv(b, vbUnicode, 932) = s Then
-        IsSjisSafe = True
-    Else
-        IsSjisSafe = False
-    End If
-End Function
