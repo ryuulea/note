@@ -1,55 +1,51 @@
-'=== SJIS不可文字チェック（行単位→差分で逐字特定） ===
+'=== メール本文 SJIS不可文字チェック ===
 Public Sub CheckMailBody_SJIS()
     Const HEADER As String = "メール本文"
     Dim ws As Worksheet, outWs As Worksheet
     Dim hdrCell As Range, col As Long, startRow As Long, lastRow As Long
-    Dim r As Long, txt As String, sjisTxt As String
-    Dim i As Long, c As String, cp As Long
-    Dim exportRowNo As Long, errCount As Long
-    Dim b() As Byte
+    Dim r As Long, txt As String
+    Dim exportRowNo As Long
+    Dim errCount As Long
     
     Set ws = ActiveSheet
     Set outWs = Worksheets("チェック結果")
     
-    ' 出力開始行
+    ' 出力開始行（E列の最後の下）
     exportRowNo = outWs.Cells(outWs.Rows.Count, "E").End(xlUp).Row + 1
     
     ' 「メール本文」列を探す
-    Set hdrCell = ws.Cells.Find(What:=HEADER, LookAt:=xlWhole)
+    Set hdrCell = ws.Rows(1).Find(What:=HEADER, LookAt:=xlWhole)
     If hdrCell Is Nothing Then
         MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
         Exit Sub
     End If
     col = hdrCell.Column
     
-    startRow = 2
+    ' データ範囲
+    startRow = 3   ' 2行目はサンプルだからスキップ
     lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
     
+    ' 本文チェック
     For r = startRow To lastRow
         txt = CStr(ws.Cells(r, col).Value)
-        If txt <> "" Then
-            ' 一整行Shift-JIS変換
-            b = StrConv(txt, vbFromUnicode, 932)
-            sjisTxt = StrConv(b, vbUnicode, 932)
-            
-            If sjisTxt <> txt Then
-                ' 有差異，逐字比對
-                For i = 1 To Len(txt)
-                    c = Mid(txt, i, 1)
-                    If Mid(sjisTxt, i, 1) <> c Then
-                        cp = AscW(c)
-                        outWs.Range("E" & exportRowNo).Value = c
-                        outWs.Range("F" & exportRowNo).Value = _
-                            "表行:" & r & " / 本文内位置:" & i & " / U+" & Hex(cp)
-                        exportRowNo = exportRowNo + 1
-                        errCount = errCount + 1
-                    End If
-                Next i
-            End If
+        
+        ' Unicode→SJIS→Unicode でラウンドトリップ検証
+        Dim b() As Byte, txt2 As String
+        On Error Resume Next
+        b = StrConv(txt, vbFromUnicode, 932)   ' SJIS化
+        txt2 = StrConv(b, vbUnicode, 932)      ' 戻す
+        On Error GoTo 0
+        
+        If txt <> txt2 Then
+            outWs.Range("E" & exportRowNo).Value = txt
+            outWs.Range("F" & exportRowNo).Value = _
+                "表行:" & r & " にSJISで保存できない文字あり"
+            exportRowNo = exportRowNo + 1
+            errCount = errCount + 1
         End If
     Next r
     
-    ' 結果
+    ' 結果メッセージ
     If errCount = 0 Then
         MsgBox "本文中にSJIS不可文字は見つかりませんでした。", vbInformation
     Else
