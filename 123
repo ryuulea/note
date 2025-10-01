@@ -1,66 +1,46 @@
-Public Sub CheckAll()
-    Dim ws As Worksheet: Set ws = ActiveSheet
-    Dim headerRow As Long
-    Dim genreResult As String, subjectResult As String, bodyResult As String
-    Dim wsOut As Worksheet
-    Dim lines() As String, i As Long
-    Dim msg As String
+'=== ⑥ メール本文チェック ===
+Private Function CheckMailBody_Result(ws As Worksheet, headerRow As Long) As String
+    Const HEADER As String = "メール本文"
+    Const MAX_LEN As Long = 900
+    Dim hdrCell As Range, col As Long, startRow As Long, lastRow As Long
+    Dim r As Long, txt As String, L As Long
+    Dim errCount As Long
+    Dim outWs As Worksheet
+    Dim exportRowNo As Long
     
-    headerRow = GetHeaderRow(ws)
-    If headerRow = -1 Then
-        MsgBox "表頭に「メール本文」が見つかりません。", vbExclamation
-        Exit Sub
+    ' 出力先シートを設定
+    Set outWs = Worksheets("チェック結果")
+    exportRowNo = outWs.Cells(outWs.Rows.Count, "E").End(xlUp).Row + 1
+    
+    ' 見出し列を探す
+    Set hdrCell = ws.Rows(headerRow).Find(What:=HEADER, LookAt:=xlWhole)
+    If hdrCell Is Nothing Then
+        CheckMailBody_Result = "列見出し「" & HEADER & "」が見つかりません。"
+        Exit Function
     End If
+    col = hdrCell.Column
     
-    ' === 各チェック結果 ===
-    genreResult = CheckTemplateGenre_Result(ws, headerRow)
-    subjectResult = CheckMailSubject_Result(ws, headerRow)
-    bodyResult = CheckMailBody_Result(ws, headerRow)
+    startRow = headerRow + 2
+    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
     
-    ' === 出力先シート ===
-    Set wsOut = Worksheets("チェック結果")
-    wsOut.Range("A:C").ClearContents
+    ' === 本文チェック ===
+    For r = startRow To lastRow
+        txt = CStr(ws.Cells(r, col).Value)
+        L = Len(txt)
+        
+        ' 900文字超過チェック
+        If L > MAX_LEN Then
+            errCount = errCount + 1
+            outWs.Range("E" & exportRowNo).Value = "―"
+            outWs.Range("F" & exportRowNo).Value = "表行:" & r & " / 文字数超過 (" & L & "文字)"
+            exportRowNo = exportRowNo + 1
+        End If
+    Next r
     
-    ' 見出し行
-    wsOut.Range("A1").Value = "ジャンル名チェック"
-    wsOut.Range("B1").Value = "件名チェック"
-    wsOut.Range("C1").Value = "本文チェック"
-    
-    ' ジャンル名 → A列
-    If InStr(genreResult, "エラー") > 0 Then
-        lines = Split(genreResult, vbCrLf)
-        For i = 0 To UBound(lines)
-            wsOut.Cells(i + 2, 1).Value = lines(i)
-        Next i
+    ' === 判定結果を返す ===
+    If errCount = 0 Then
+        CheckMailBody_Result = "OK（全て " & MAX_LEN & "文字以内）"
     Else
-        wsOut.Cells(2, 1).Value = "OK（エラーなし）"
+        CheckMailBody_Result = "エラー " & errCount & " 件 : ご確認ください"
     End If
-    
-    ' 件名 → B列
-    If InStr(subjectResult, "エラー") > 0 Then
-        lines = Split(subjectResult, vbCrLf)
-        For i = 0 To UBound(lines)
-            wsOut.Cells(i + 2, 2).Value = lines(i)
-        Next i
-    Else
-        wsOut.Cells(2, 2).Value = "OK（エラーなし）"
-    End If
-    
-    ' 本文 → C列
-    If InStr(bodyResult, "エラー") > 0 Then
-        lines = Split(bodyResult, vbCrLf)
-        For i = 0 To UBound(lines)
-            wsOut.Cells(i + 2, 3).Value = lines(i)
-        Next i
-    Else
-        wsOut.Cells(2, 3).Value = "OK（エラーなし）"
-    End If
-    
-    ' === MsgBox（簡潔表示） ===
-    msg = "テンプレートジャンル名：" & IIf(InStr(genreResult, "エラー") > 0, "エラーあり", "OK") & vbCrLf & _
-          "メール件名：" & IIf(InStr(subjectResult, "エラー") > 0, "エラーあり", "OK") & vbCrLf & _
-          "メール本文：" & IIf(InStr(bodyResult, "エラー") > 0, "エラーあり", "OK") & vbCrLf & vbCrLf & _
-          "詳細はチェック結果シートをご確認ください。"
-    
-    MsgBox msg, vbInformation
-End Sub
+End Function
