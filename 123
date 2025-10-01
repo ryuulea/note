@@ -1,14 +1,89 @@
+'=== メール本文 SJIS不可文字チェック ===
+Public Sub CheckMailBody_SJIS()
+    Const HEADER As String = "メール本文"
+    Dim ws As Worksheet, outWs As Worksheet
+    Dim hdrCell As Range, col As Long
+    Dim startRow As Long, lastRow As Long
+    Dim r As Long, txt As String, L As Long
+    Dim i As Long, c As String, cp As Long
+    Dim exportRowNo As Long
+    Dim errCount As Long
+    Dim headerRow As Long
+
+    Set ws = ActiveSheet
+    Set outWs = Worksheets("チェック結果")
+
+    ' 出力開始行（E列の最後の下）
+    exportRowNo = outWs.Cells(outWs.Rows.Count, "E").End(xlUp).Row + 1
+
+    ' 表頭行を探す（900文字チェックと同じロジック）
+    headerRow = GetHeaderRow(ws, HEADER)
+    If headerRow = -1 Then
+        MsgBox "表頭に「" & HEADER & "」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
+
+    col = ws.Cells(headerRow, 1).EntireRow.Find(What:=HEADER, LookAt:=xlWhole).Column
+
+    ' データ範囲（サンプル行をスキップするため +2）
+    startRow = headerRow + 2
+    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
+
+    ' 本文チェック
+    For r = startRow To lastRow
+        txt = CStr(ws.Cells(r, col).Value)
+        L = Len(txt)
+
+        For i = 1 To L
+            c = Mid(txt, i, 1)
+            cp = AscW(c)
+
+            ' SJIS不可文字チェック
+            If Not IsSjisSafe(cp) Then
+                outWs.Range("E" & exportRowNo).Value = c
+                outWs.Range("F" & exportRowNo).Value = _
+                    "表行:" & r & "（サンプル行スキップ済み） / 正文内位置:" & i & " / 文字コード: U+" & Hex(cp)
+                exportRowNo = exportRowNo + 1
+                errCount = errCount + 1
+            End If
+        Next i
+    Next r
+
+    ' 結果メッセージ
+    If errCount = 0 Then
+        MsgBox "本文中にSJIS不可文字は見つかりませんでした。（サンプル行はスキップ済み）", vbInformation
+    Else
+        MsgBox "本文中にSJIS不可文字が " & errCount & " 件見つかりました。" & vbCrLf & _
+               "詳細はチェック結果シートをご確認ください。（サンプル行はスキップ済み）", vbExclamation
+    End If
+End Sub
+
 '=== 表頭行を探す共通関数 ===
 Private Function GetHeaderRow(ws As Worksheet) As Long
     Const HEADER As String = "メール本文"
     Dim hdrCell As Range
     
-    ' シート全体から検索（部分一致NG、完全一致のみ）
+    ' シート全体から検索（完全一致のみ）
     Set hdrCell = ws.Cells.Find(What:=HEADER, LookAt:=xlWhole)
     
     If hdrCell Is Nothing Then
         GetHeaderRow = -1
     Else
         GetHeaderRow = hdrCell.Row
+    End If
+End Function
+
+
+'=== SJIS判定関数 ===
+Private Function IsSjisSafe(cp As Long) As Boolean
+    On Error Resume Next
+    Dim s As String
+    s = ChrW(cp)
+    Dim b() As Byte
+    b = StrConv(s, vbFromUnicode, 932) ' 932 = Shift-JIS
+    If StrConv(b, vbUnicode, 932) = s Then
+        IsSjisSafe = True
+    Else
+        IsSjisSafe = False
     End If
 End Function
