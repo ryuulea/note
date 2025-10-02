@@ -1,19 +1,21 @@
-Public Sub DebugDeleteLoop()
+Public Sub DebugDeleteLoop2()
 
     Dim wsMail As Worksheet
     Dim lastMail As Long, i As Long
     Dim fnum As Integer, filePath As String
+    Dim val As String
     
     Set wsMail = Worksheets("メール本文テンプレート情報")
     lastMail = wsMail.Cells(wsMail.Rows.Count, "A").End(xlUp).Row
     
-    filePath = ThisWorkbook.Path & "\debug_delete.txt"
+    filePath = ThisWorkbook.Path & "\debug_delete2.txt"
     fnum = FreeFile
     Open filePath For Output As #fnum
     
     For i = 11 To lastMail
-        If wsMail.Cells(i, 4).Value = "削除" Then
-            Print #fnum, "行:" & i & " 削除 → E=" & wsMail.Cells(i, 5).Value & " F=" & wsMail.Cells(i, 6).Value & " G=" & wsMail.Cells(i, 7).Value
+        val = Trim(Replace(Replace(wsMail.Cells(i, 4).Value, vbCr, ""), vbLf, "")) ' 去掉换行、前后空格
+        If InStr(val, "削除") > 0 Then
+            Print #fnum, "行:" & i & " D列=" & val & " → E=" & wsMail.Cells(i, 5).Value & " F=" & wsMail.Cells(i, 6).Value & " G=" & wsMail.Cells(i, 7).Value
         End If
     Next i
     
