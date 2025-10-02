@@ -1,19 +1,23 @@
-Public Sub DebugDeleteRow11()
+Public Sub DebugDeleteAll()
 
     Dim wsMail As Worksheet
-    Dim filePath As String, fnum As Integer
+    Dim lastMail As Long, i As Long
+    Dim fnum As Integer, filePath As String
     Dim val As String
     
     Set wsMail = ThisWorkbook.Sheets("メール本文テンプレート情報")
+    lastMail = wsMail.Cells(wsMail.Rows.Count, "A").End(xlUp).Row
     
-    val = CStr(wsMail.Cells(11, 4).Value2)  ' 第11行 D列
-    
-    filePath = ThisWorkbook.Path & "\debug_row11.txt"
+    filePath = ThisWorkbook.Path & "\debug_delete_all.txt"
     fnum = FreeFile
     Open filePath For Output As #fnum
-    Print #fnum, "第11行D列=[" & val & "]"
-    Close #fnum
     
-    MsgBox "DebugRow11 完了: " & filePath
+    For i = 11 To lastMail
+        val = CStr(wsMail.Cells(i, 4).Value2)   ' D列
+        Print #fnum, "行:" & i & " D列=[" & val & "]"
+    Next i
+    
+    Close #fnum
+    MsgBox "DebugDeleteAll 完了: " & filePath
 
 End Sub
