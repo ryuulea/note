@@ -1,4 +1,4 @@
-Public Sub DebugDeleteLoop7()
+Public Sub DebugDeleteLoop9()
 
     Dim wsMail As Worksheet
     Dim lastMail As Long, i As Long
@@ -9,16 +9,17 @@ Public Sub DebugDeleteLoop7()
     
     lastMail = wsMail.Cells(wsMail.Rows.Count, "A").End(xlUp).Row
     
-    filePath = ThisWorkbook.Path & "\debug_delete7.txt"
+    filePath = ThisWorkbook.Path & "\debug_delete9.txt"
     fnum = FreeFile
     Open filePath For Output As #fnum
     
-    For i = 1 To lastMail
-        val = CStr(wsMail.Cells(i, 2).Value2)   ' B列（扱い）
-        Print #fnum, "行:" & i & " B列=[" & val & "]"
+    ' 从第11行开始才是数据
+    For i = 11 To lastMail
+        val = CStr(wsMail.Cells(i, 4).Value2)   ' 👈 D列=扱い
+        Print #fnum, "行:" & i & " D列=[" & val & "]"
     Next i
     
     Close #fnum
-    MsgBox "Debug7 完了: " & filePath
+    MsgBox "Debug9 完了: " & filePath
 
 End Sub
