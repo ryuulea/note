@@ -12,18 +12,17 @@ Public Sub SqlDeleteExport()
     lastMail = wsMail.Cells(wsMail.Rows.Count, 1).End(xlUp).Row
     lastShop = wsShop.Cells(wsShop.Rows.Count, 1).End(xlUp).Row
     
-    filePath = ThisWorkbook.Path & "\" & Left(ThisWorkbook.Name, InStrRev(ThisWorkbook.Name, ".") - 1) & "_delete.sql"
+    filePath = ThisWorkbook.Path & "\delete_output.sql"
     fnum = FreeFile
     Open filePath For Output As #fnum
     
-    For i = 2 To lastMail
-        If wsMail.Cells(i, 2).Value <> "" Then
+    For i = 11 To lastMail   ' 从第11行开始（数据起点）
+        If wsMail.Cells(i, 4).Value = "削除" Then   ' D列＝削除
             
-            ' KEY_CD 自动流水号
-            keyCd = Format(i - 1, "0000")
+            ' KEY_CD 自动编号
+            keyCd = Format(i - 10, "0000")
             
-            If wsMail.Cells(i, 2).Value = "対象店舗" Then
-                ' 去对象店舗sheet里展开
+            If wsMail.Cells(i, 5).Value = "対象店舗" Then   ' E列＝対象店舗
                 For j = 2 To lastShop
                     sql = "DELETE FROM WPWP01.TB_ENT_MAIL_TEMPLATE_WORK " & vbCrLf & _
                           "(CTGRY_CD, KEY_CD, COLUMN_NAME, VAL, LAST_UPD_DATE, LAST_UPD_USER, INS_DATE, INS_USER)" & vbCrLf & _
@@ -32,18 +31,17 @@ Public Sub SqlDeleteExport()
                     Print #fnum, sql
                 Next j
             Else
-                ' 直接用给定的店舗コード
+                ' E列直接是店舗コード
                 sql = "DELETE FROM WPWP01.TB_ENT_MAIL_TEMPLATE_WORK " & vbCrLf & _
                       "(CTGRY_CD, KEY_CD, COLUMN_NAME, VAL, LAST_UPD_DATE, LAST_UPD_USER, INS_DATE, INS_USER)" & vbCrLf & _
-                      "VALUES('001','" & keyCd & "','SB代理店コード','" & wsMail.Cells(i, 2).Value & "'," & _
+                      "VALUES('001','" & keyCd & "','SB代理店コード','" & wsMail.Cells(i, 5).Value & "'," & _
                       "SYSDATE,'scsk_uchin',SYSDATE,'scsk_uchin');"
                 Print #fnum, sql
             End If
-            
         End If
     Next i
     
     Close #fnum
-    MsgBox "削除SQL出力完了: " & vbCrLf & filePath, vbInformation
+    MsgBox "削除SQL出力完了！" & vbCrLf & filePath, vbInformation
 
 End Sub
