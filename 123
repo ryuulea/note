@@ -1,47 +1,95 @@
-Public Sub SqlDeleteExport()
+Option Explicit
+
+Public Sub ExportDelete_SQL_SB()
 
     Dim wsMail As Worksheet, wsShop As Worksheet
     Dim lastMail As Long, lastShop As Long
-    Dim i As Long, j As Long
-    Dim sql As String, keyCd As String
+    Dim startRow As Long, i As Long, j As Long
     Dim fnum As Integer, filePath As String
+    Dim outIdx As Long, wrote As Long, skipped As Long
+    Dim sql As String, ctry As String, keyCd As String
+    Dim actionVal As String, eVal As String, fVal As String, gVal As String
+    Dim isTargetList As Boolean, code As String
+    Dim hdr As Range
     
+    ' ▼▼ 请确认这两个Sheet名与标签一致 ▼▼
     Set wsMail = Worksheets("メール本文テンプレート情報")
     Set wsShop = Worksheets("対象店舗")
-    
-    lastMail = wsMail.Cells(wsMail.Rows.Count, 1).End(xlUp).Row
-    lastShop = wsShop.Cells(wsShop.Rows.Count, 1).End(xlUp).Row
-    
-    filePath = ThisWorkbook.Path & "\delete_output.sql"
+
+    ' 末行
+    lastMail = wsMail.Cells(wsMail.Rows.Count, "A").End(xlUp).Row
+    lastShop = wsShop.Cells(wsShop.Rows.Count, "A").End(xlUp).Row
+
+    ' 起始行：自动找“扱い”表头；找不到则用11行
+    Set hdr = wsMail.Cells.Find(What:="扱い", LookAt:=xlWhole)
+    If hdr Is Nothing Then
+        startRow = 11
+    Else
+        startRow = hdr.Row + 2
+    End If
+
+    ' 输出文件
+    filePath = ThisWorkbook.Path & "\" & Left(ThisWorkbook.Name, InStrRev(ThisWorkbook.Name, ".") - 1) & "_delete.txt"
     fnum = FreeFile
     Open filePath For Output As #fnum
-    
-    For i = 11 To lastMail   ' 从第11行开始（数据起点）
-        If wsMail.Cells(i, 4).Value = "削除" Then   ' D列＝削除
-            
-            ' KEY_CD 自动编号
-            keyCd = Format(i - 10, "0000")
-            
-            If wsMail.Cells(i, 5).Value = "対象店舗" Then   ' E列＝対象店舗
+
+    ctry = "001"            ' 固定SB
+    outIdx = 0              ' KEY_CD 用的流水号
+
+    For i = startRow To lastMail
+
+        actionVal = Trim(CStr(wsMail.Cells(i, "D").Value))  ' D列：扱い（削除/新規）
+
+        ' 只处理「削除」
+        If actionVal <> "" And InStr(actionVal, "削除") > 0 Then
+
+            ' 读取 E/F/G 列（有的写“対象店舗”，有的直接是门店代码/名称）
+            eVal = Trim(CStr(wsMail.Cells(i, "E").Value))
+            fVal = Trim(CStr(wsMail.Cells(i, "F").Value))
+            gVal = Trim(CStr(wsMail.Cells(i, "G").Value))
+
+            isTargetList = (InStr(eVal, "対象店舗") > 0) Or (InStr(fVal, "対象店舗") > 0) Or (InStr(gVal, "対象店舗") > 0)
+
+            If isTargetList Then
+                ' 到「対象店舗」sheet 展开
                 For j = 2 To lastShop
-                    sql = "DELETE FROM WPWP01.TB_ENT_MAIL_TEMPLATE_WORK " & vbCrLf & _
-                          "(CTGRY_CD, KEY_CD, COLUMN_NAME, VAL, LAST_UPD_DATE, LAST_UPD_USER, INS_DATE, INS_USER)" & vbCrLf & _
-                          "VALUES('001','" & keyCd & "','SB代理店コード','" & wsShop.Cells(j, 1).Value & "'," & _
-                          "SYSDATE,'scsk_uchin',SYSDATE,'scsk_uchin');"
-                    Print #fnum, sql
+                    code = Trim(CStr(wsShop.Cells(j, "A").Value)) ' A列=取次店コード
+                    If code <> "" Then
+                        outIdx = outIdx + 1
+                        keyCd = Format(outIdx, "0000")
+                        sql = "DELETE FROM WPWP01.TB_ENT_MAIL_TEMPLATE_WORK" & vbCrLf & _
+                              "(CTGRY_CD, KEY_CD, COLUMN_NAME, VAL, LAST_UPD_DATE, LAST_UPD_USER, INS_DATE, INS_USER)" & vbCrLf & _
+                              "VALUES('" & ctry & "','" & keyCd & "','SB代理店コード','" & code & "',SYSDATE,'scsk_uchin',SYSDATE,'scsk_uchin');"
+                        Print #fnum, sql
+                        wrote = wrote + 1
+                    End If
                 Next j
+
             Else
-                ' E列直接是店舗コード
-                sql = "DELETE FROM WPWP01.TB_ENT_MAIL_TEMPLATE_WORK " & vbCrLf & _
-                      "(CTGRY_CD, KEY_CD, COLUMN_NAME, VAL, LAST_UPD_DATE, LAST_UPD_USER, INS_DATE, INS_USER)" & vbCrLf & _
-                      "VALUES('001','" & keyCd & "','SB代理店コード','" & wsMail.Cells(i, 5).Value & "'," & _
-                      "SYSDATE,'scsk_uchin',SYSDATE,'scsk_uchin');"
-                Print #fnum, sql
+                ' 本行直接给了门店代码：优先取F列（代码列），没有再取E列
+                If fVal <> "" And InStr(fVal, "対象店舗") = 0 Then
+                    code = fVal
+                Else
+                    code = eVal
+                End If
+
+                If code <> "" Then
+                    outIdx = outIdx + 1
+                    keyCd = Format(outIdx, "0000")
+                    sql = "DELETE FROM WPWP01.TB_ENT_MAIL_TEMPLATE_WORK" & vbCrLf & _
+                          "(CTGRY_CD, KEY_CD, COLUMN_NAME, VAL, LAST_UPD_DATE, LAST_UPD_USER, INS_DATE, INS_USER)" & vbCrLf & _
+                          "VALUES('" & ctry & "','" & keyCd & "','SB代理店コード','" & code & "',SYSDATE,'scsk_uchin',SYSDATE,'scsk_uchin');"
+                    Print #fnum, sql
+                    wrote = wrote + 1
+                Else
+                    skipped = skipped + 1
+                End If
             End If
         End If
     Next i
-    
-    Close #fnum
-    MsgBox "削除SQL出力完了！" & vbCrLf & filePath, vbInformation
 
+    Close #fnum
+    MsgBox "削除SQL出力完成！" & vbCrLf & filePath & vbCrLf & _
+           "生成条数: " & wrote & " / 跳过: " & skipped & vbCrLf & _
+           "起始行: " & startRow & "  数据末行: " & lastMail, vbInformation
 End Sub
