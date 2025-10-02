@@ -1,25 +1,19 @@
-Public Sub DebugDeleteLoop10()
+Public Sub DebugDeleteRow11()
 
     Dim wsMail As Worksheet
-    Dim lastMail As Long, i As Long
-    Dim fnum As Integer, filePath As String
+    Dim filePath As String, fnum As Integer
+    Dim val As String
     
     Set wsMail = ThisWorkbook.Sheets("メール本文テンプレート情報")
-    lastMail = wsMail.Cells(wsMail.Rows.Count, "A").End(xlUp).Row
     
-    filePath = ThisWorkbook.Path & "\debug_delete10.txt"
+    val = CStr(wsMail.Cells(11, 4).Value2)  ' 第11行 D列
+    
+    filePath = ThisWorkbook.Path & "\debug_row11.txt"
     fnum = FreeFile
     Open filePath For Output As #fnum
-    
-    For i = 11 To lastMail
-        Print #fnum, "行:" & i & _
-            " Value=[" & CStr(wsMail.Cells(i, 4).Value) & "]" & _
-            " Value2=[" & CStr(wsMail.Cells(i, 4).Value2) & "]" & _
-            " Text=[" & wsMail.Cells(i, 4).Text & "]" & _
-            " Formula=[" & wsMail.Cells(i, 4).Formula & "]"
-    Next i
-    
+    Print #fnum, "第11行D列=[" & val & "]"
     Close #fnum
-    MsgBox "Debug10 完了: " & filePath
+    
+    MsgBox "DebugRow11 完了: " & filePath
 
 End Sub
