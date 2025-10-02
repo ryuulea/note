@@ -1,92 +1,49 @@
-'=== メール本文 SJIS不可文字チェック ===
-Public Sub CheckMailBody_SJIS()
-    Const HEADER As String = "メール本文"
-    Dim ws As Worksheet, outWs As Worksheet
-    Dim hdrCell As Range, col As Long
-    Dim startRow As Long, lastRow As Long
-    Dim r As Long, txt As String, L As Long
-    Dim i As Long, c As String, cp As Long
-    Dim exportRowNo As Long
-    Dim errCount As Long
-    Dim headerRow As Long
+Public Sub SqlDeleteExport()
+
+    Dim wsMail As Worksheet, wsShop As Worksheet
+    Dim lastMail As Long, lastShop As Long
+    Dim i As Long, j As Long
+    Dim sql As String, keyCd As String
+    Dim fnum As Integer, filePath As String
     
-    Set ws = ActiveSheet
-    Set outWs = Worksheets("チェック結果")
+    Set wsMail = Worksheets("メール本文テンプレート情報")
+    Set wsShop = Worksheets("対象店舗")
     
-    ' 出力開始行（E列の最後の下）
-    exportRowNo = outWs.Cells(outWs.Rows.Count, "E").End(xlUp).Row + 1
+    lastMail = wsMail.Cells(wsMail.Rows.Count, 1).End(xlUp).Row
+    lastShop = wsShop.Cells(wsShop.Rows.Count, 1).End(xlUp).Row
     
-    ' === 表頭行を探す ===
-    headerRow = GetHeaderRow(ws, HEADER)
-    If headerRow = -1 Then
-        MsgBox "表頭に「" & HEADER & "」が見つかりません。", vbExclamation
-        Exit Sub
-    End If
+    filePath = ThisWorkbook.Path & "\" & Left(ThisWorkbook.Name, InStrRev(ThisWorkbook.Name, ".") - 1) & "_delete.sql"
+    fnum = FreeFile
+    Open filePath For Output As #fnum
     
-    ' === メール本文列を特定 ===
-    Set hdrCell = ws.Rows(headerRow).Find(What:=HEADER, LookAt:=xlWhole)
-    If hdrCell Is Nothing Then
-        MsgBox "列見出し「" & HEADER & "」が見つかりません。", vbExclamation
-        Exit Sub
-    End If
-    col = hdrCell.Column
-    
-    ' === データ範囲 ===
-    startRow = headerRow + 2   ' 表頭の次の行はサンプルだからスキップ
-    lastRow = ws.Cells(ws.Rows.Count, col).End(xlUp).Row
-    
-    ' === 本文チェック ===
-    For r = startRow To lastRow
-        txt = CStr(ws.Cells(r, col).Value)
-        L = Len(txt)
-        
-        For i = 1 To L
-            c = Mid(txt, i, 1)
-            cp = AscW(c)
+    For i = 2 To lastMail
+        If wsMail.Cells(i, 2).Value <> "" Then
             
-            ' SJIS不可文字チェック
-            If Not IsSjisSafe(cp) Then
-                outWs.Range("E" & exportRowNo).Value = c
-                outWs.Range("F" & exportRowNo).Value = _
-                    "表行:" & r & " / 位置:" & i & " / U+" & Hex(cp)
-                exportRowNo = exportRowNo + 1
-                errCount = errCount + 1
+            ' KEY_CD 自动流水号
+            keyCd = Format(i - 1, "0000")
+            
+            If wsMail.Cells(i, 2).Value = "対象店舗" Then
+                ' 去对象店舗sheet里展开
+                For j = 2 To lastShop
+                    sql = "DELETE FROM WPWP01.TB_ENT_MAIL_TEMPLATE_WORK " & vbCrLf & _
+                          "(CTGRY_CD, KEY_CD, COLUMN_NAME, VAL, LAST_UPD_DATE, LAST_UPD_USER, INS_DATE, INS_USER)" & vbCrLf & _
+                          "VALUES('001','" & keyCd & "','SB代理店コード','" & wsShop.Cells(j, 1).Value & "'," & _
+                          "SYSDATE,'scsk_uchin',SYSDATE,'scsk_uchin');"
+                    Print #fnum, sql
+                Next j
+            Else
+                ' 直接用给定的店舗コード
+                sql = "DELETE FROM WPWP01.TB_ENT_MAIL_TEMPLATE_WORK " & vbCrLf & _
+                      "(CTGRY_CD, KEY_CD, COLUMN_NAME, VAL, LAST_UPD_DATE, LAST_UPD_USER, INS_DATE, INS_USER)" & vbCrLf & _
+                      "VALUES('001','" & keyCd & "','SB代理店コード','" & wsMail.Cells(i, 2).Value & "'," & _
+                      "SYSDATE,'scsk_uchin',SYSDATE,'scsk_uchin');"
+                Print #fnum, sql
             End If
-        Next i
-    Next r
+            
+        End If
+    Next i
     
-    ' === 結果メッセージ ===
-    If errCount = 0 Then
-        MsgBox "本文中にSJIS不可文字は見つかりませんでした。", vbInformation
-    Else
-        MsgBox "本文中にSJIS不可文字が " & errCount & " 件見つかりました。" & vbCrLf & _
-               "詳細はチェック結果シートをご確認ください。", vbExclamation
-    End If
+    Close #fnum
+    MsgBox "削除SQL出力完了: " & vbCrLf & filePath, vbInformation
+
 End Sub
-
-
-'=== SJIS保存可否を判定する関数 ===
-Private Function IsSjisSafe(cp As Long) As Boolean
-    On Error Resume Next
-    Dim s As String
-    s = ChrW(cp)
-    Dim b() As Byte
-    b = StrConv(s, vbFromUnicode, 932) ' 932 = Shift-JIS
-    If StrConv(b, vbUnicode, 932) = s Then
-        IsSjisSafe = True
-    Else
-        IsSjisSafe = False
-    End If
-End Function
-
-
-'=== 表頭行を探す関数（共通利用）===
-Private Function GetHeaderRow(ws As Worksheet, HEADER As String) As Long
-    Dim hdrCell As Range
-    Set hdrCell = ws.Cells.Find(What:=HEADER, LookAt:=xlWhole)
-    If hdrCell Is Nothing Then
-        GetHeaderRow = -1
-    Else
-        GetHeaderRow = hdrCell.Row
-    End If
-End Function
