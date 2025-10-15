@@ -1,53 +1,36 @@
-Public Sub ExportDeleteSQL()
-
-    Dim wsMail As Worksheet, wsShop As Worksheet
-    Dim lastMail As Long, i As Long, j As Long
-    Dim fnum As Integer, filePath As String
-    Dim val As String, keyCd As String
-    Dim outIdx As Long, sql As String
-    
-    Set wsMail = ThisWorkbook.Sheets("メール本文テンプレート情報")
-    Set wsShop = ThisWorkbook.Sheets("対象店舗")
-    
-    lastMail = wsMail.Cells(wsMail.Rows.Count, "A").End(xlUp).Row
-    
-    filePath = ThisWorkbook.Path & "\delete_output.sql"
-    fnum = FreeFile
-    Open filePath For Output As #fnum
-    
-    outIdx = 0
-    For i = 11 To lastMail
-        val = Trim(CStr(wsMail.Cells(i, 4).Value2))   ' D列=扱い
-        
-        If val = "削除" Then
-            outIdx = outIdx + 1
-            keyCd = Format(outIdx, "0000")
-            
-            ' 直接给了取次店コード
-            If wsMail.Cells(i, 6).Value <> "" Then
-                sql = "DELETE FROM WPWP01.TB_ENT_MAIL_TEMPLATE_WORK" & vbCrLf & _
-                      "(CTGRY_CD, KEY_CD, COLUMN_NAME, VAL, LAST_UPD_DATE, LAST_UPD_USER, INS_DATE, INS_USER)" & vbCrLf & _
-                      "VALUES('001','" & keyCd & "','SB代理店コード','" & wsMail.Cells(i, 6).Value & "',SYSDATE,'scsk_uchin',SYSDATE,'scsk_uchin');"
-                Print #fnum, sql
-            End If
-            
-            ' 如果写了「対象店舗」→ 去展开
-            If wsMail.Cells(i, 5).Value = "対象店舗" Then
-                For j = 2 To wsShop.Cells(wsShop.Rows.Count, "A").End(xlUp).Row
-                    If wsShop.Cells(j, 1).Value <> "" Then
-                        outIdx = outIdx + 1
-                        keyCd = Format(outIdx, "0000")
-                        sql = "DELETE FROM WPWP01.TB_ENT_MAIL_TEMPLATE_WORK" & vbCrLf & _
-                              "(CTGRY_CD, KEY_CD, COLUMN_NAME, VAL, LAST_UPD_DATE, LAST_UPD_USER, INS_DATE, INS_USER)" & vbCrLf & _
-                              "VALUES('001','" & keyCd & "','SB代理店コード','" & wsShop.Cells(j, 1).Value & "',SYSDATE,'scsk_uchin',SYSDATE,'scsk_uchin');"
-                        Print #fnum, sql
-                    End If
-                Next j
-            End If
-        End If
-    Next i
-    
-    Close #fnum
-    MsgBox "削除SQL出力完成: " & filePath, vbInformation
-
-End Sub
+1．改行文字（CRLF）が正しく認識されず、改行が消失して登録される
+　→ 改行文字を CHR(13)||CHR(10) に置換し、クエリ出力時も正しく改行されるように修正
+2．半角スペースが連続する場合に正しく保持されず、空白が削除される
+　→ 文字列中の半角スペースをそのまま保持するよう変換処理を修正
+3．全角スペースが削除され、文字間が詰まる
+　→ 全角スペースを削除対象から除外し、元のレイアウトを維持するよう修正
+4．特殊制御文字（U+000B）が登録データに残存している
+　→ U+000B を検知して削除する処理を追加
+5．零幅スペース（U+200B）が削除されず、検索結果や比較で不一致となる
+　→ U+200B を削除または半角スペースに置換するロジックを追加
+6．「&」を含む文字列が SQL 実行時に誤認識される
+　→ クエリファイル冒頭に SET DEFINE OFF を自動付与するよう修正
+7．シングルクォーテーション ' を含む文字列で SQL 文がエラーになる
+　→ ' を '' に置換するエスケープ処理を追加
+8．ダブルクォーテーション " を含む文字列で意図しない囲み処理が発生
+　→ " の場合は変換対象外とし、登録時にそのまま保持されるよう修正
+9．絵文字（😀、💡等）がSJIS変換時に文字化けまたは登録エラーとなる
+　→ 絵文字を検知して削除する前処理を追加
+10．支文文字（旧字体など）が一部登録後に文字化けしている
+　→ 登録前にUnicode正規化（NFC）を行う処理を追加
+11．改ページ文字（\f, 0x0C）が存在するとクエリが途中で途切れる
+　→ 該当文字を削除してからクエリ文字列を生成するよう修正
+12．タブ文字（\t, 0x09）が残存し、Excel上とクエリ上の見た目が不一致
+　→ タブ文字を半角スペースに置換する処理を追加
+13．NULL文字（0x00）が含まれる場合、登録処理が中断される
+　→ 0x00 を削除してからエンコード処理を行うように修正
+14．サロゲートペア文字（例：𠮷）がSJIS変換時に破損する
+　→ サロゲートペアを対応する代替文字（例：「吉」）に変換する処理を追加
+15．特殊句読点（・、。）が一部全角→半角に自動変換されてしまう
+　→ 句読点を全角固定で保持するよう変換仕様を統一
+16．クエリ内に「'」で囲まれた絵文字が含まれると、SQL実行時に解析エラー
+　→ エスケープ処理後に再クォート処理を行うよう修正
+17．改行＋絵文字が混在する場合、改行処理が途中で途切れる
+　→ 改行置換と絵文字削除を順序制御して処理されるように修正
+18．全角記号（～、＝、※など）が文字コード変換時に別コードに変換される
+　→ 全角記号をUnicode基準で保持するよう変換マッピングを修正
